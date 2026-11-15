@@ -97,7 +97,7 @@ def _reset_state():
              msg="", jpg=None, reel=False, fx="normal", stab="on", focus=[0.5, 0.5], focus_d=5.0, focus_cur=5.0,
              focus_vel=0.0, shots=[], spots=[], rev="", fps=24.0, status="Starting…", ready=False, error="",
              phone_name="", sens=1.0, smooth=RIGS["handheld"]["smooth"], pscale=1.0, tripod=False, rig="handheld",
-             krate=0, pos=None, xr=False, ct=None, rtt=None, track=None, jpg_id=0, ws=0)
+             krate=0, pos=None, xr=False, ct=None, rtt=None, track=None, jpg_id=0, ws=0, zsmooth=True)
 
 
 _reset_state()
@@ -298,6 +298,9 @@ def _pos(v, fallback):
 
 
 def smooth_zoom(dt):
+    if not S.get("zsmooth", True):  # fast zoom: straight to the new lens, no smoothing
+        S["lens_cur"], S["lens_vel"] = min(ZOOM_MAX, max(ZOOM_MIN, _pos(S["lens"], ZOOM_1X))), 0.0
+        return S["lens_cur"]
     tgt = math.log(min(ZOOM_MAX, max(ZOOM_MIN, _pos(S["lens"], ZOOM_1X))))
     cur = _pos(S["lens_cur"], 0.0)
     if cur <= 0 or not math.isfinite(S["lens_vel"]):
@@ -517,7 +520,8 @@ def begin_run(mode):
         S["recenter"] = False
     st = settings()
     S["rec0"] = dict(track=copy_track(T), set=st, q_phone=S["q"], pos=S.get("pos"), lens=_pos(S["lens_cur"], ZOOM_1X),
-                     lens_vel=S["lens_vel"], lens_tgt=_pos(S["lens"], ZOOM_1X), jx=S["jx"], jy=S["jy"], vz=S["vz"])
+                     lens_vel=S["lens_vel"], lens_tgt=_pos(S["lens"], ZOOM_1X), jx=S["jx"], jy=S["jy"], vz=S["vz"],
+                     zsmooth=S.get("zsmooth", True))
     S["raw"] = []
     S.update(mode=mode, run={"a": s["start"], "b": s["end"], "t0": time.time()}, samples=[], msg="", video="",
              take_ride=T.get("ride", ""), take_reel=bool(S.get("_reel_on")), take_fx=S["fx"],
@@ -580,8 +584,11 @@ def rebuild_from_phone(tout):
             pa, pb = ps[j - 1], ps[j]
             pp = pa.lerp(pb, u) if pa is not None and pb is not None else (pb or pa)
         track_step(T, qp, pp, jx, jy, vz, st, dt, ride)
-        x, lv = crit_damp(math.log(lens), lv, math.log(min(ZOOM_MAX, max(ZOOM_MIN, tgt))), ZOOM_W, dt)
-        lens = math.exp(x)
+        if r0.get("zsmooth", True):
+            x, lv = crit_damp(math.log(lens), lv, math.log(min(ZOOM_MAX, max(ZOOM_MIN, tgt))), ZOOM_W, dt)
+            lens = math.exp(x)
+        else:  # fast zoom in the saved take too
+            lens = min(ZOOM_MAX, max(ZOOM_MIN, tgt))
         while io < len(tout) and tout[io] <= t + 1e-9:
             L.append(T["loc"].copy()); Q.append(T["q"].copy()); N.append(lens)
             io += 1
@@ -1276,6 +1283,8 @@ def handle_msg(msg):
             S["rig"] = msg["rig"]
         if msg.get("krate") in KRATES:
             S["krate"] = msg["krate"]
+    if isinstance(msg.get("zsmooth"), bool):
+        S["zsmooth"] = msg["zsmooth"]
     if "xr" in msg:
         S["xr"] = bool(msg["xr"])
     rt = _num(msg.get("rtt"), 0, 10000)

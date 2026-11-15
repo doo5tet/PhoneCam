@@ -49,7 +49,7 @@ Keyframing a camera by hand looks robotic. A real handheld camera has life: tiny
 
 ## Quick start (3 minutes)
 
-1. **Install** — download [`phonecam-1.1.0.zip`](https://github.com/doo5tet/PhoneCam/releases/latest) and drag it into Blender (4.2 or newer).
+1. **Install** — download [`phonecam-1.1.1.zip`](https://github.com/doo5tet/PhoneCam/releases/latest) and drag it into Blender (4.2 or newer).
 2. **Start** — in the 3D Viewport press **N**, open the **PhoneCam** tab, click **Start PhoneCam**.
 3. **Scan** — point your phone's Camera app at the QR code. The first time, follow the 1-minute setup on the phone. Done — film!
 
@@ -59,7 +59,7 @@ Keyframing a camera by hand looks robotic. A real handheld camera has life: tiny
 
 PhoneCam is a Blender **extension** (Blender 4.2, 4.3, 4.4, 4.5, 5.x).
 
-1. Download **`phonecam-1.1.0.zip`** from [Releases](https://github.com/doo5tet/PhoneCam/releases/latest). Don't unzip it.
+1. Download **`phonecam-1.1.1.zip`** from [Releases](https://github.com/doo5tet/PhoneCam/releases/latest). Don't unzip it.
 2. Either **drag the zip into the Blender window**, or go to **Edit → Preferences → Get Extensions → ⌄ (top right) → Install from Disk…** and pick the zip.
 3. Make sure **PhoneCam** is ticked. That's it.
 
@@ -104,7 +104,7 @@ Next time, just scan and film. Tip: **Share → Add to Home Screen** turns Phone
 | **⊙** | Reset aim to where your phone points |
 | **▭ / ▯** | Wide 16:9 or vertical 9:16 |
 | ✋ | Stabilizer: On → Action → Off |
-| **⚙** | Rig preset, Tripod, Sensitivity / Smoothing / Position scale, keyframe rate, AR tracking, horizon, grid |
+| **⚙** | Rig preset, Tripod, Sensitivity / Smoothing / Position scale, Smooth zoom on/off, keyframe rate, AR tracking, horizon, grid |
 | **Practice** | Rehearse the shot without recording |
 | 🔴 | Record. Then **Watch**, **Retake** or **Save video** |
 

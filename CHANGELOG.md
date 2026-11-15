@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- **Smooth zoom on/off** (⚙ settings): off = the lens buttons and pinch switch zoom instantly, in the live view and in saved takes.
+
 ## 1.1.0
 
 - **Rig presets**: Handheld, Dolly, Crane, Cinematic, Raw — plus **Tripod** (rotation only).

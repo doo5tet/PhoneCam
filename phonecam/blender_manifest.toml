@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "phonecam"
-version = "1.1.0"
+version = "1.1.1"
 name = "PhoneCam"
 tagline = "Turn your phone into a handheld camera for Blender"
 maintainer = "doo5tet"
