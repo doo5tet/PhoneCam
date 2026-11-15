@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="/icon.png">
+<title>PhoneCam · Connect your phone</title>
+<style>
+  :root{--y:#ffd60a;--t2:rgba(235,235,245,.62);--stroke:rgba(255,255,255,.14)}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:#fff;font:500 16px/1.45 -apple-system,"SF Pro Text",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+       background:radial-gradient(120% 70% at 50% 0%,#2b2b38 0%,#0c0c12 55%,#000 100%);padding:max(20px,env(safe-area-inset-top)) 16px 40px}
+  .wrap{max-width:520px;margin:0 auto}
+  .head{display:flex;align-items:center;gap:14px;margin:6px 0 18px}
+  .logo{width:56px;height:56px;border-radius:15px;flex:none;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .sub{margin:2px 0 0;color:var(--t2)}
+  .glass{background:rgba(44,44,52,.42);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);
+         border:.5px solid var(--stroke);border-radius:22px;box-shadow:0 10px 30px rgba(0,0,0,.3),inset 0 .5px 0 rgba(255,255,255,.12)}
+  .card{padding:16px 16px 14px;margin:0 0 12px}
+  .n{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--y);color:#000;font-weight:800;align-items:center;justify-content:center;margin-right:10px;font-size:14px}
+  .t{font-weight:700;font-size:17px;display:flex;align-items:center}
+  ol{margin:10px 0 0;padding-left:22px;color:var(--t2)} li{margin:0 0 6px} b{color:#fff}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:16px;font-weight:700;font-size:17px;text-decoration:none;margin-top:12px;
+       background:#fff;color:#000}
+  .btn.ghost{background:rgba(255,255,255,.1);color:#fff;border:.5px solid var(--stroke)}
+  .note{color:var(--t2);font-size:14px;margin:10px 0 0}
+  .status{display:flex;align-items:center;gap:10px;padding:12px 16px;margin:0 0 14px}
+  .spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.2);border-top-color:var(--y);animation:r 1s linear infinite;flex:none}
+  @keyframes r{to{transform:rotate(360deg)}}
+  .ok{width:18px;height:18px;border-radius:50%;background:#30d158;flex:none}
+  .hidden{display:none}
+  .tabs{display:flex;gap:6px;margin:0 0 12px;padding:4px;border-radius:14px}
+  .tab{flex:1;height:36px;border-radius:10px;border:0;background:none;color:var(--t2);font:inherit;font-weight:700}
+  .tab.on{background:rgba(255,255,255,.14);color:#fff}
+</style>
+</head><body><div class="wrap">
+  <div class="head"><img class="logo" src="/icon.png" alt=""><div><h1>PhoneCam</h1><p class="sub">Turn your phone into a camera for Blender</p></div></div>
+
+  <div id="nokey" class="card glass hidden"><div class="t">Scan the QR code in Blender</div>
+    <p class="note">In Blender, press <b>N</b> in the 3D Viewport, open the <b>PhoneCam</b> tab, click <b>Start</b> and scan the QR code with your phone's camera.</p></div>
+
+  <div id="main">
+    <div class="status glass" id="status"><span class="spin" id="ico"></span><span id="stext">Checking the connection…</span></div>
+
+    <div id="steps" class="hidden">
+      <p class="note" style="margin:0 0 12px">One-time setup (about 1 minute). Phones only share their motion sensors with secure pages, so your phone needs to trust your own computer once.</p>
+      <div class="tabs glass"><button class="tab" data-os="ios">iPhone / iPad</button><button class="tab" data-os="android">Android</button></div>
+
+      <div data-for="ios">
+        <div class="card glass"><div class="t"><span class="n">1</span>Download the certificate</div>
+          <a class="btn" href="/PhoneCam-CA.cer">Download certificate</a>
+          <p class="note">Safari asks to allow a configuration profile: tap <b>Allow</b>, then <b>Close</b>.</p></div>
+        <div class="card glass"><div class="t"><span class="n">2</span>Install it</div>
+          <ol><li>Open the <b>Settings</b> app.</li><li>Tap <b>Profile Downloaded</b> near the top.</li>
+              <li>Tap <b>Install</b>, enter your passcode, <b>Install</b> again, then <b>Done</b>.</li></ol></div>
+        <div class="card glass"><div class="t"><span class="n">3</span>Trust it</div>
+          <ol><li>Settings → <b>General</b> → <b>About</b>.</li><li>Scroll down → <b>Certificate Trust Settings</b>.</li>
+              <li>Switch on <b>PhoneCam on …</b> (your computer) → <b>Continue</b>.</li></ol></div>
+      </div>
+
+      <div data-for="android" class="hidden">
+        <div class="card glass"><div class="t"><span class="n">1</span>Download the certificate</div>
+          <a class="btn" href="/PhoneCam-CA.crt">Download certificate</a></div>
+        <div class="card glass"><div class="t"><span class="n">2</span>Install it as a CA certificate</div>
+          <ol><li>Open <b>Settings</b> and search for <b>“CA certificate”</b>.</li>
+              <li>Tap <b>Install a certificate</b> → <b>CA certificate</b> → <b>Install anyway</b>.</li>
+              <li>Pick <b>PhoneCam-CA.crt</b> from Downloads.</li></ol>
+          <p class="note">Menu names differ a little between phone brands (often under Security → Encryption &amp; credentials).</p></div>
+      </div>
+
+      <div class="card glass"><div class="t"><span class="n" id="lastn">4</span>Open the camera</div>
+        <p class="note" style="margin-top:6px">This page notices by itself when your phone trusts the computer and opens the camera.</p>
+        <a class="btn ghost" id="open" href="#">Open the camera now</a></div>
+    </div>
+  </div>
+</div>
+<script>
+const CAM = "{{CAMERA_URL}}", PING = "{{PING_URL}}";
+const $ = id => document.getElementById(id);
+if (!CAM) { $("nokey").classList.remove("hidden"); $("main").classList.add("hidden"); }
+else {
+  $("open").href = CAM;
+  const android = /android/i.test(navigator.userAgent);
+  const pick = os => { document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.os === os));
+    document.querySelectorAll("[data-for]").forEach(d => d.classList.toggle("hidden", d.dataset.for !== os));
+    $("lastn").textContent = os === "ios" ? "4" : "3"; };
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => pick(t.dataset.os));
+  pick(android ? "android" : "ios");
+  const trusted = () => Promise.race([fetch(PING + "?t=" + Date.now(), {mode: "no-cors", cache: "no-store"}).then(() => true, () => false),
+                                      new Promise(r => setTimeout(() => r(false), 2500))]);
+  (async function check(first){
+    if (await trusted()) {
+      $("ico").className = "ok"; $("stext").textContent = "Connected — opening the camera…";
+      setTimeout(() => location.replace(CAM), first ? 200 : 600); return;
+    }
+    $("ico").className = "spin"; $("stext").textContent = "Waiting for the one-time setup below…";
+    $("steps").classList.remove("hidden");
+    setTimeout(() => check(false), 3000);
+  })(true);
+}
+</script>
+</body></html>

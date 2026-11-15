@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://doo5tet.github.io/PhoneCam/sitemap.xml

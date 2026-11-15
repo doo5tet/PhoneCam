@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PhoneCam">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>PhoneCam</title>
+<style>
+  :root{--y:#ffd60a;--red:#ff3b30;--green:#30d158;--t1:#fff;--t2:rgba(235,235,245,.62);--t3:rgba(235,235,245,.32);
+        --glass:rgba(28,28,30,.38);--glass2:rgba(28,28,30,.62);--stroke:rgba(255,255,255,.14);--blur:blur(22px) saturate(170%)}
+  *{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#000;color:var(--t1);font:500 15px/1.3 -apple-system,"SF Pro Text",system-ui,sans-serif;
+            overflow:hidden;touch-action:none;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
+  button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation}
+  .glass{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:.5px solid var(--stroke);
+         box-shadow:0 10px 30px rgba(0,0,0,.28),inset 0 .5px 0 rgba(255,255,255,.14)}
+  svg{display:block}
+
+  /* viewfinder */
+  #vfwrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
+  #vf{width:100%;height:100%;object-fit:contain;display:block}
+  #frame{position:absolute;width:min(100vw,177.78vh);height:min(100vh,56.25vw);pointer-events:none;border-radius:2px;transition:box-shadow .25s}
+  body.reel #frame{width:min(100vw,56.25vh);height:min(100vh,177.78vw)}
+  body.grid #frame::before,body.grid #frame::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(90deg,transparent calc(33.33% - .5px),rgba(255,255,255,.22) calc(33.33% - .5px),rgba(255,255,255,.22) calc(33.33% + .5px),transparent calc(33.33% + .5px),transparent calc(66.66% - .5px),rgba(255,255,255,.22) calc(66.66% - .5px),rgba(255,255,255,.22) calc(66.66% + .5px),transparent calc(66.66% + .5px))}
+  body.grid #frame::after{transform:rotate(90deg) scale(calc(100vh / 100vw),calc(100vw / 100vh))}
+  body.rec #frame{box-shadow:inset 0 0 0 2px var(--red)}
+  #hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--t2);font-size:14px;text-align:center;max-width:70vw;pointer-events:none}
+
+  /* HUD layers */
+  .hud{position:fixed;inset:0;pointer-events:none}
+  .hud>*{pointer-events:auto}
+  .safe-t{top:max(10px,env(safe-area-inset-top))}
+  .top{position:absolute;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));display:flex;gap:8px;align-items:center;justify-content:space-between}
+  .cap{height:38px;border-radius:19px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;font-weight:600}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  body.rec #status{background:rgba(255,59,48,.88);border-color:rgba(255,255,255,.2)}
+  body.rec .dot{background:#fff;box-shadow:none;animation:blink 1s steps(2) infinite}
+  body.off .dot{background:#ff9f0a;box-shadow:0 0 8px #ff9f0a}
+  @keyframes blink{50%{opacity:.25}}
+  #shotbtn{max-width:44vw;overflow:hidden}
+  #shotbtn small{color:var(--y);font-size:11px;font-weight:700;letter-spacing:.08em}
+  #shotname{overflow:hidden;text-overflow:ellipsis}
+  .icons{display:flex;gap:8px}
+  .ib{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}
+  .ib.on{color:var(--y)}
+  .ib .badge{position:absolute;bottom:-3px;right:-3px;font-size:9px;font-weight:800;background:var(--y);color:#000;border-radius:7px;padding:1px 4px}
+  #bar{position:fixed;left:0;top:0;height:3px;width:0;background:var(--y);z-index:6;transition:width .15s linear}
+  body.rec #bar{background:var(--red)}
+
+  .spots{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:6px;max-width:calc(100vw - 32px);overflow-x:auto;scrollbar-width:none;padding:2px}
+  .spots::-webkit-scrollbar{display:none}
+  .spot{height:32px;border-radius:16px;padding:0 13px;font-size:13px;font-weight:600;color:var(--t2);display:flex;align-items:center;gap:6px;flex:none}
+  .spot.on{color:#000;background:var(--y);border-color:var(--y)}
+
+  /* left: walk + up/down */
+  .left{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));display:flex;gap:12px;align-items:flex-end}
+  #pad{width:124px;height:124px;border-radius:50%;position:relative;touch-action:none}
+  #pad::after{content:"";position:absolute;inset:34%;border-radius:50%;border:1px dashed rgba(255,255,255,.18)}
+  #knob{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.92);position:absolute;left:37px;top:37px;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .08s}
+  .lbl{position:absolute;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.12em;color:var(--t2);font-weight:700}
+  #pad .lbl{top:-18px}
+  .ud{display:flex;flex-direction:column;gap:8px}
+  .sq{width:54px;height:54px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--t2)}
+  .sq svg{margin-bottom:2px;color:#fff}
+  .sq.held{background:rgba(255,214,10,.9);color:#000}
+  .sq.held svg{color:#000}
+
+  /* right: modes, lens capsule, shutter */
+  .shutterbox{position:absolute;right:max(16px,env(safe-area-inset-right));top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+  #rec{width:76px;height:76px;border-radius:50%;border:4px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  #rec i{display:block;width:60px;height:60px;border-radius:50%;background:var(--red);transition:all .22s cubic-bezier(.3,.7,.2,1)}
+  body.rec #rec i{width:28px;height:28px;border-radius:7px}
+  #rec.dim{opacity:.35}
+  #reclbl{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--t2)}
+  #lenses{position:absolute;right:calc(max(16px,env(safe-area-inset-right)) + 212px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column-reverse;gap:4px;padding:5px;border-radius:26px;touch-action:none}
+  .lz{width:38px;height:38px;border-radius:50%;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.25)}
+  .lz.on{color:var(--y);font-size:13px;background:rgba(0,0,0,.55)}
+  #modes{position:absolute;right:calc(max(16px,env(safe-area-inset-right)) + 96px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding:6px 8px;border-radius:16px}
+  .md{font-size:11px;font-weight:800;letter-spacing:.11em;color:var(--t2);padding:5px 6px}
+  .md.on{color:var(--y)}
+  .md[disabled]{opacity:.3}
+
+  /* bottom centre */
+  .actions{position:absolute;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
+  .btn{height:46px;border-radius:23px;padding:0 20px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+  .btn.primary{background:var(--y);color:#000;border-color:var(--y)}
+  .btn.danger{background:rgba(255,59,48,.85);color:#fff;border-color:rgba(255,59,48,.9)}
+  .hide{display:none!important}
+  body.review .left,body.review #lenses,body.review #modes{opacity:.25;pointer-events:none}
+
+  /* overlays */
+  #zread{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);font-size:30px;font-weight:700;color:var(--y);text-shadow:0 2px 14px rgba(0,0,0,.6);display:none;pointer-events:none;z-index:4}
+  #afbox{position:fixed;width:76px;height:76px;margin:-38px 0 0 -38px;border:1.5px solid var(--y);display:none;pointer-events:none;z-index:3;transition:width .25s,height .25s,margin .25s}
+  #afbox.small{width:60px;height:60px;margin:-30px 0 0 -30px}
+  #afbox b{position:absolute;left:100%;top:-1px;margin-left:6px;font-size:11px;color:var(--y);white-space:nowrap;font-weight:700}
+  #level{position:fixed;left:50%;top:50%;width:110px;margin-left:-55px;pointer-events:none;z-index:2;display:none}
+  #level i{position:absolute;left:0;right:0;top:0;border-top:1.5px solid rgba(255,255,255,.6)}
+  #level.ok i{border-color:var(--y)}
+  #toast{position:fixed;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 50px);transform:translateX(-50%);z-index:9;display:none;max-width:86vw;text-align:center;padding:10px 16px;border-radius:18px;font-weight:600;font-size:14px}
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:8;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .sheet.show{display:flex}
+  .card{border-radius:24px;padding:18px;width:min(560px,92vw);max-height:86vh;overflow-y:auto;touch-action:pan-y;background:rgba(28,28,30,.72)}
+  .card h3{margin:0 0 12px;font-size:19px;font-weight:700}
+  .choice{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:13px 14px;border-radius:14px;margin:0 0 8px;background:rgba(255,255,255,.06);border:.5px solid var(--stroke);font-weight:600}
+  .choice small{color:var(--t2);font-weight:500}
+  .choice.on{background:rgba(255,214,10,.16);border-color:rgba(255,214,10,.6)}
+  .ring{width:96px;height:96px;margin:6px auto 12px;position:relative}
+  .ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px}
+  .muted{color:var(--t2);font-weight:500;margin:0}
+  .help li{margin:0 0 10px;color:var(--t2)}
+  .help li b{color:#fff}
+
+  /* start + turn screens */
+  #start,#turn,#pair{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;
+    background:radial-gradient(120% 90% at 50% 0%,#2a2a35 0%,#0b0b10 55%,#000 100%)}
+  #turn,#pair{display:none}
+  .logo{width:84px;height:84px;border-radius:22px;background:linear-gradient(145deg,#3a3a46,#121218);border:.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;box-shadow:0 20px 50px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.2)}
+  h1{margin:0;font-size:32px;font-weight:800;letter-spacing:-.02em}
+  .sub{margin:0;color:var(--t2);max-width:420px}
+  .choices{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .big{width:200px;border-radius:22px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;font-weight:700;font-size:17px}
+  .big small{color:var(--t2);font-weight:500;font-size:13px}
+  .big.primary{background:#fff;color:#000}
+  .big.primary small{color:rgba(0,0,0,.55)}
+  .foot{color:var(--t3);font-size:12px}
+  #err{color:#ff8a80;margin:0}
+  #turn .ico{animation:spin 1.8s ease-in-out infinite}
+  body.reel #turn .ico{animation:none}
+  @keyframes spin{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+
+  /* vertical (9:16) layout */
+  body.reel .top{flex-wrap:wrap;justify-content:center;row-gap:8px}
+  body.reel #shotbtn{max-width:60vw}
+  body.reel .spots{max-width:calc(100vw - 24px)}
+  body.reel .shutterbox{top:auto;transform:translateX(50%);right:50%;bottom:max(18px,env(safe-area-inset-bottom))}
+  body.reel #lenses{right:auto;left:50%;top:auto;transform:translateX(-50%);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 110px);flex-direction:row}
+  body.reel #modes{right:auto;left:50%;top:auto;transform:translateX(-50%);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 166px);flex-direction:row}
+  body.reel .left{bottom:max(18px,env(safe-area-inset-bottom))}
+  body.reel #pad{width:104px;height:104px}
+  body.reel #knob{left:30px;top:30px;width:44px;height:44px}
+  body.reel .actions{left:auto;right:max(14px,env(safe-area-inset-right));transform:none;bottom:calc(max(18px,env(safe-area-inset-bottom)) + 14px);flex-direction:column;align-items:flex-end}
+  body.reel.review .actions{left:50%;right:auto;transform:translateX(-50%);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 110px);flex-direction:row}
+  body.reel.review .left,body.reel.review .shutterbox,body.reel.review #lenses,body.reel.review #modes{display:none}
+</style>
+</head><body class="off">
+
+<div id="vfwrap"><img id="vf" alt=""><div id="frame"></div><div id="hint"></div></div>
+<div id="afbox"><b id="aflabel"></b></div><div id="level"><i></i></div><div id="zread"></div>
+<div id="bar"></div>
+
+<div class="hud">
+  <div class="top safe-t">
+    <div class="cap glass" id="status"><span class="dot"></span><span id="state">Connecting</span></div>
+    <button class="cap glass" id="shotbtn" aria-label="Choose shot"><small>SHOT</small><span id="shotname">Timeline</span>
+      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="icons">
+      <button class="ib glass" id="fmt" aria-label="Wide or vertical video">
+        <svg id="fmtico" width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="5.5" width="16" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button>
+      <button class="ib glass on" id="stab" aria-label="Stabilizer">
+        <svg width="20" height="20" viewBox="0 0 20 20"><path d="M6 10.5V5.8a1.2 1.2 0 0 1 2.4 0V9m0-4.6V4a1.2 1.2 0 0 1 2.4 0v5m0-4a1.2 1.2 0 0 1 2.4 0v4.6m0-2.6a1.2 1.2 0 0 1 2.4 0v4.4c0 3-2.3 5.6-5.4 5.6-2 0-3.3-.9-4.4-2.6L4.2 11.6a1.3 1.3 0 0 1 2-1.6l.8 1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="badge" id="stabbadge">ON</span></button>
+      <button class="ib glass" id="grid" aria-label="Grid">
+        <svg width="20" height="20" viewBox="0 0 20 20"><path d="M7 3v14M13 3v14M3 7h14M3 13h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+      <button class="ib glass" id="center" aria-label="Reset aim">
+        <svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <button class="ib glass" id="help" aria-label="Help">
+        <svg width="20" height="20" viewBox="0 0 20 20"><path d="M7.6 7.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+  <div class="spots" id="spots"></div>
+
+  <div class="left">
+    <div id="pad" class="glass"><div class="lbl">WALK</div><div id="knob"></div></div>
+    <div class="ud">
+      <button class="sq glass" id="up" aria-label="Move up"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 10.5 8 5.5l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>UP</button>
+      <button class="sq glass" id="down" aria-label="Move down"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 5.5 8 10.5l5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>DOWN</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn glass" id="practice">
+      <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 2.2v9.6L11.5 7z" fill="currentColor"/></svg>Practice</button>
+    <button class="btn glass hide" id="watch"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 2.2v9.6L11.5 7z" fill="currentColor"/></svg>Watch</button>
+    <button class="btn glass hide" id="retake"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.6-3.7M3 2.8v2.6h2.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Retake</button>
+    <button class="btn primary glass hide" id="save"><svg width="16" height="16" viewBox="0 0 16 16"><path d="m3 8.5 3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Save video</button>
+  </div>
+</div>
+
+<div class="hud">
+  <div id="modes" class="glass"><button class="md on" data-fx="normal">VIDEO</button><button class="md" data-fx="cinema">CINEMATIC</button><button class="md" data-fx="fisheye">FISHEYE</button></div>
+  <div id="lenses" class="glass"></div>
+  <div class="shutterbox"><button id="rec" aria-label="Record"><i></i></button><div id="reclbl">REC</div></div>
+</div>
+
+<div id="toast" class="glass"></div>
+
+<div class="sheet" id="shots"><div class="card glass"><h3>Choose a shot</h3><div id="shotlist"></div>
+  <p class="muted" style="font-size:13px">Shots come from the timeline markers in Blender.</p></div></div>
+
+<div class="sheet" id="saving"><div class="card glass" style="text-align:center;width:min(380px,90vw)">
+  <div class="ring"><svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="42" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="7"/>
+    <circle id="ringfg" cx="48" cy="48" r="42" fill="none" stroke="#ffd60a" stroke-width="7" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" transform="rotate(-90 48 48)"/></svg><b id="pct">0%</b></div>
+  <h3 style="margin-bottom:6px">Saving your video</h3><p class="muted" id="savetext">Keep Blender open.</p></div></div>
+
+<div class="sheet" id="helpsheet"><div class="card glass help"><h3>How to film</h3><ul style="padding-left:18px;margin:0">
+  <li><b>Move your phone</b> to aim the camera. <b>⊙</b> resets the aim.</li>
+  <li><b>WALK</b> stick moves the camera; <b>UP / DOWN</b> raise or lower it.</li>
+  <li><b>Zoom:</b> tap <b>.5 · 1× · 2 · 3 · 5</b>, pinch the picture, or slide along the lens buttons.</li>
+  <li><b>CINEMATIC</b> blurs the background — tap the picture to choose what is sharp. <b>FISHEYE</b> is super wide.</li>
+  <li><b>Practice</b> plays the shot without recording. The red button records; the video saves to your computer.</li>
+  <li>After a take: <b>Watch</b>, <b>Retake</b> or <b>Save video</b>.</li>
+  <li>Camera spots (top) jump to the cameras in your Blender scene.</li>
+  <li>✋ <b>Stabilizer</b>: On → Action (extra smooth) → Off.</li></ul>
+  <button class="btn primary glass" id="helpok" style="margin:14px auto 0">Got it</button></div></div>
+
+<div id="start">
+  <div class="logo"><svg width="46" height="46" viewBox="0 0 46 46"><rect x="4" y="12" width="28" height="22" rx="6" fill="none" stroke="#fff" stroke-width="2.6"/><path d="m32 20 9-5v16l-9-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/><circle cx="18" cy="23" r="5" fill="#ffd60a"/></svg></div>
+  <h1>PhoneCam</h1>
+  <p class="sub">Your phone is now a camera for Blender. Point it, walk, zoom — and record.</p>
+  <div class="choices">
+    <button class="big primary" id="go"><svg width="34" height="22" viewBox="0 0 34 22"><rect x="1.5" y="1.5" width="31" height="19" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>Wide video<small>Hold your phone sideways · 16:9</small></button>
+    <button class="big glass" id="goreel"><svg width="22" height="34" viewBox="0 0 22 34"><rect x="1.5" y="1.5" width="19" height="31" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>Vertical video<small>Hold upright · Reels, TikTok, Shorts</small></button>
+  </div>
+  <p id="err"></p>
+  <p class="foot">Free &amp; open source · your phone and computer talk directly over your Wi-Fi</p>
+</div>
+<div id="turn"><div class="ico"><svg width="54" height="54" viewBox="0 0 54 54"><rect x="17" y="6" width="20" height="42" rx="5" fill="none" stroke="#fff" stroke-width="3"/></svg></div>
+  <p class="sub" id="turnmsg">Turn your phone sideways to film.</p>
+  <button class="btn glass" id="turnswitch">Film vertical instead</button></div>
+<div id="pair"><div class="logo">🔗</div><h1 style="font-size:24px">Scan the QR code again</h1>
+  <p class="sub">This link is old or incomplete. In Blender, open the <b>PhoneCam</b> tab in the sidebar (press N) and scan the QR code.</p></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+let KEY = params.get("k") || "";
+try { if (KEY) localStorage.setItem("pc_key", KEY); else KEY = localStorage.getItem("pc_key") || ""; } catch (e) {}
+const st = {q:null, jx:0, jy:0, vz:0, lens:null, recenter:false, cmd:null, shot:null, hello:true, reel:false, fx:"normal", stab:"on", focus:null};
+let srv = {mode:"LIVE"}, lensRev = -1, rev = "", SHOTS = [], fisheyeOK = true;
+const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const load = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+
+// ---------- shots & camera spots ----------
+function buildShots(list){
+  SHOTS = list; const box = $("shotlist"); box.innerHTML = "";
+  list.forEach(sc => {
+    const b = document.createElement("button"); b.className = "choice" + (sc.id === st.shot ? " on" : "");
+    b.innerHTML = `<span>${sc.name}</span><small>${sc.secs} s</small>`;
+    b.onclick = () => { st.shot = sc.id; st.cmd = "goto"; $("shotname").textContent = sc.name; $("shots").classList.remove("show");
+      document.querySelectorAll("#shotlist .choice").forEach(x => x.classList.remove("on")); b.classList.add("on"); toast("Ready: " + sc.name); };
+    box.appendChild(b);
+  });
+}
+function buildSpots(names, active){
+  const box = $("spots"); box.innerHTML = "";
+  (names || []).forEach((n, i) => { const b = document.createElement("button"); b.className = "spot glass" + (i === active ? " on" : "");
+    b.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="3.5" width="8.5" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m9.5 6 3.5-2v6l-3.5-2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>${n}`;
+    b.onclick = () => { st.cmd = "spot"; st.spot = i; markSpot(i); }; box.appendChild(b); });
+  placeSpots();
+}
+function markSpot(i){ document.querySelectorAll("#spots .spot").forEach((b, j) => b.classList.toggle("on", j === i)); }
+function placeSpots(){ $("spots").style.top = (document.querySelector(".top").getBoundingClientRect().bottom + 8) + "px"; }
+addEventListener("resize", placeSpots);
+
+// ---------- motion -> camera rotation (W3C device frame -> Blender camera frame) ----------
+const D = Math.PI / 180;
+const qmul = (a, b) => [a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3], a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],
+                        a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1], a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]];
+const qax = (x, y, z, a) => { const s = Math.sin(a/2); return [Math.cos(a/2), x*s, y*s, z*s]; };
+const rotq = (q, v) => { const p = qmul(qmul(q, [0, ...v]), [q[0], -q[1], -q[2], -q[3]]); return [p[1], p[2], p[3]]; };
+let side = 90, physLandscape = false;  // gravity tells how the phone is really held (works with rotation lock on)
+addEventListener("deviceorientation", e => {
+  if (e.alpha == null) return;
+  const q0 = qmul(qmul(qax(0,0,1,e.alpha*D), qax(1,0,0,e.beta*D)), qax(0,1,0,e.gamma*D));
+  const xz = rotq(q0, [1,0,0])[2], yz = rotq(q0, [0,1,0])[2];
+  if (Math.abs(xz) > 0.55 && Math.abs(xz) > Math.abs(yz)) { side = xz > 0 ? 90 : -90; physLandscape = true; }
+  else if (Math.abs(yz) > 0.55) physLandscape = false;
+  st.q = st.reel ? q0 : qmul(q0, qax(0,0,1,-side*D));
+  updateTurn(); updateLevel();
+});
+function updateTurn(){
+  const portrait = innerHeight > innerWidth; let msg = "";
+  if (document.body.classList.contains("started")) {
+    if (st.reel) { if (!portrait || physLandscape) msg = "Vertical video: hold your phone <b>upright</b>."; }
+    else if (portrait) msg = physLandscape ? "Your screen <b>rotation lock</b> is on. Turn it off in Control Center so the controls can turn sideways."
+                                           : "Turn your phone <b>sideways</b> to film wide.";
+  }
+  $("turn").style.display = msg ? "flex" : "none";
+  if (msg) { $("turnmsg").innerHTML = msg; $("turnswitch").textContent = st.reel ? "Film wide instead" : "Film vertical instead"; }
+  placeSpots();
+}
+addEventListener("resize", updateTurn);
+
+// ---------- wide / vertical ----------
+function setReel(on, quiet){
+  st.reel = on; st.recenter = true; document.body.classList.toggle("reel", on); store("pc_reel", on ? "1" : "0");
+  $("fmtico").innerHTML = on ? '<rect x="5.5" y="2" width="9" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/>'
+                             : '<rect x="2" y="5.5" width="16" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/>';
+  updateTurn(); if (!quiet) toast(on ? "Vertical 9:16 — hold your phone upright" : "Wide 16:9 — hold your phone sideways");
+}
+$("fmt").onclick = () => { if (srv.mode !== "LIVE") return toast("Change this before you record"); setReel(!st.reel); };
+$("turnswitch").onclick = () => { if (srv.mode === "LIVE") setReel(!st.reel); };
+
+// ---------- start ----------
+$("go").onclick = () => { setReel(false, true); startCam(); };
+$("goreel").onclick = () => { setReel(true, true); startCam(); };
+async function startCam(){
+  if (!KEY) { $("pair").style.display = "flex"; return; }
+  try {
+    if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== "granted") { $("err").textContent = "Motion access was blocked. Close this tab, open the link again and tap Allow."; return; }
+    }
+    try { await navigator.wakeLock?.request("screen"); } catch (e) {}
+    $("start").style.display = "none"; document.body.classList.add("started"); updateTurn();
+    st.recenter = true; poseLoop(); viewLoop();
+    if (!load("pc_helped", "")) { $("helpsheet").classList.add("show"); store("pc_helped", "1"); }
+  } catch (e) { $("err").textContent = e.message; }
+}
+
+// ---------- walk stick & up/down ----------
+const pad = $("pad"), knob = $("knob");
+function padMove(t){ const r = pad.getBoundingClientRect(), R = r.width / 2; let x = (t.clientX - r.left - R) / R, y = (t.clientY - r.top - R) / R;
+  const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+  knob.style.transform = `translate(${x * R * .62}px,${y * R * .62}px)`; st.jx = x; st.jy = -y; }
+const padEnd = () => { st.jx = st.jy = 0; knob.style.transform = ""; };
+pad.addEventListener("touchstart", e => { padMove(e.targetTouches[0]); e.preventDefault(); }, {passive:false});
+pad.addEventListener("touchmove", e => { padMove(e.targetTouches[0]); e.preventDefault(); }, {passive:false});
+pad.addEventListener("touchend", padEnd); pad.addEventListener("touchcancel", padEnd);
+function hold(el, on, off){ el.addEventListener("touchstart", e => { el.classList.add("held"); on(); e.preventDefault(); }, {passive:false});
+  const end = () => { el.classList.remove("held"); off(); }; el.addEventListener("touchend", end); el.addEventListener("touchcancel", end); }
+hold($("up"), () => st.vz = 1, () => st.vz = 0); hold($("down"), () => st.vz = -1, () => st.vz = 0);
+
+// ---------- iPhone-style zoom ----------
+const Z1 = 24, ZMIN = 0.5, ZMAX = 10, LENSES = [0.5, 1, 2, 3, 5];
+let zoom = 1, zAnim = null, zreadT = 0;
+const clampZ = z => Number.isFinite(z) ? Math.min(ZMAX, Math.max(ZMIN, z)) : 1;
+const fmtZ = z => (z < 1 ? z.toFixed(1).replace(/^0/, "") : (Math.abs(z - Math.round(z)) < .05 ? Math.round(z) + "" : z.toFixed(1))) + "×";
+function buildLenses(){ const box = $("lenses"); box.innerHTML = "";
+  LENSES.forEach(z => { const b = document.createElement("button"); b.className = "lz"; b.dataset.z = z; box.appendChild(b); }); updateLensUI(); }
+function updateLensUI(){ let act = LENSES[0]; LENSES.forEach(z => { if (zoom >= z - .04) act = z; });
+  document.querySelectorAll(".lz").forEach(b => { const z = +b.dataset.z, on = z === act; b.classList.toggle("on", on);
+    b.textContent = on ? fmtZ(zoom) : (z < 1 ? ".5" : z + ""); }); }
+function showZread(){ const r = $("zread"); r.textContent = fmtZ(zoom); r.style.display = "block"; clearTimeout(zreadT); zreadT = setTimeout(() => r.style.display = "none", 700); }
+function setZoom(z, animate){ z = clampZ(z);
+  if (animate) zAnim = {from: zoom, to: z, t0: performance.now(), dur: 420};
+  else { zAnim = null; zoom = z; st.lens = Math.round(Z1 * zoom * 100) / 100; updateLensUI(); showZread(); } }
+function stepZoom(now){ if (!zAnim) return;
+  const u = Math.min(1, (now - zAnim.t0) / zAnim.dur), e = u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3) / 2;
+  zoom = Math.exp(Math.log(zAnim.from) + (Math.log(zAnim.to) - Math.log(zAnim.from)) * e);
+  st.lens = Math.round(Z1 * zoom * 100) / 100; updateLensUI(); showZread(); if (u >= 1) zAnim = null; }
+(function zt(now){ stepZoom(now); requestAnimationFrame(zt); })(performance.now());
+(function(){ const box = $("lenses"); let t0 = null, z0 = 1, moved = false;
+  const along = t => st.reel ? t.clientX : -t.clientY;
+  box.addEventListener("touchstart", e => { t0 = along(e.targetTouches[0]); z0 = zoom; moved = false; zAnim = null; e.preventDefault(); }, {passive:false});
+  box.addEventListener("touchmove", e => { const d = along(e.targetTouches[0]) - t0; if (Math.abs(d) > 8) moved = true; if (moved) setZoom(z0 * Math.exp(d / 130)); e.preventDefault(); }, {passive:false});
+  box.addEventListener("touchend", e => { if (!moved) { const b = e.target.closest(".lz"); if (b) setZoom(+b.dataset.z, true); } t0 = null; });
+})();
+(function(){ const wrap = $("vfwrap"); let pinch = null, tap = null;
+  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  wrap.addEventListener("touchstart", e => {
+    if (e.touches.length === 2) { const d = dist(e.touches[0], e.touches[1]); pinch = d > 20 ? {d, z: zoom} : null; tap = null; zAnim = null; }
+    else if (e.touches.length === 1) tap = {x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now()};
+    e.preventDefault(); }, {passive:false});
+  wrap.addEventListener("touchmove", e => {
+    if (pinch && e.touches.length === 2) setZoom(pinch.z * Math.max(20, dist(e.touches[0], e.touches[1])) / pinch.d);
+    else if (tap && Math.hypot(e.touches[0].clientX - tap.x, e.touches[0].clientY - tap.y) > 12) tap = null;
+    e.preventDefault(); }, {passive:false});
+  wrap.addEventListener("touchend", e => { if (e.touches.length < 2) pinch = null;
+    if (tap && e.touches.length === 0 && performance.now() - tap.t < 400) focusAt(tap.x, tap.y); tap = null; });
+})();
+["gesturestart", "gesturechange", "gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive:false}));
+buildLenses();
+
+// ---------- tap to focus ----------
+let afT = 0;
+function focusAt(x, y){
+  const r = $("vf").getBoundingClientRect(), iw = $("vf").naturalWidth || 16, ih = $("vf").naturalHeight || 9;
+  const sc = Math.min(r.width / iw, r.height / ih), w = iw * sc, h = ih * sc, ox = r.left + (r.width - w) / 2, oy = r.top + (r.height - h) / 2;
+  const u = (x - ox) / w, v = (y - oy) / h; if (u < 0 || u > 1 || v < 0 || v > 1) return;
+  st.focus = [Math.round(u * 1000) / 1000, Math.round(v * 1000) / 1000];
+  const b = $("afbox"); b.style.left = x + "px"; b.style.top = y + "px"; b.classList.remove("small"); b.style.display = "block";
+  clearTimeout(afT); afT = setTimeout(() => b.classList.add("small"), 350);
+  if (st.fx !== "cinema") setTimeout(() => { if (st.fx !== "cinema") b.style.display = "none"; }, 900);
+}
+
+// ---------- looks: video / cinematic / fisheye ----------
+function setFx(fx, quiet){
+  if (fx === "fisheye" && !fisheyeOK) { if (!quiet) toast("Fisheye needs ffmpeg on your computer — see the guide"); fx = "normal"; }
+  st.fx = fx; store("pc_fx", fx);
+  document.querySelectorAll(".md").forEach(b => b.classList.toggle("on", b.dataset.fx === fx));
+  if (fx === "fisheye") setZoom(0.5, true); else if (zoom < 1 && !quiet) setZoom(1, true);
+  if (fx === "cinema") { const r = $("vf").getBoundingClientRect(); if (!st.focus) focusAt(r.left + r.width / 2, r.top + r.height / 2); }
+  else $("afbox").style.display = "none";
+  if (!quiet) toast({normal: "Video", fisheye: "Fisheye: super wide, curved edges", cinema: "Cinematic: tap the picture to choose what is sharp"}[fx]);
+}
+document.querySelectorAll(".md").forEach(b => b.onclick = () => {
+  if (!(srv.mode === "LIVE" || srv.mode === "PRACTICE")) return toast("Change this before you record"); setFx(b.dataset.fx); });
+
+// ---------- stabilizer, grid, aim, help ----------
+const STAB = {on: "ON", action: "MAX", off: "OFF"};
+function setStab(v, quiet){ st.stab = v; $("stabbadge").textContent = STAB[v]; $("stab").classList.toggle("on", v !== "off"); store("pc_stab", v);
+  if (!quiet) toast({on: "Stabilizer on: smooths small shakes", action: "Action mode: extra smooth, like a gimbal", off: "Stabilizer off: raw handheld"}[v]); }
+$("stab").onclick = () => { if (!(srv.mode === "LIVE" || srv.mode === "PRACTICE")) return toast("Change this before you record"); setStab({on: "action", action: "off", off: "on"}[st.stab]); };
+$("grid").onclick = () => { const on = !document.body.classList.contains("grid"); document.body.classList.toggle("grid", on); $("grid").classList.toggle("on", on); store("pc_grid", on ? "1" : ""); };
+$("center").onclick = () => { st.recenter = true; toast("Aim reset — the camera points where your phone points"); };
+$("help").onclick = () => $("helpsheet").classList.add("show");
+$("helpok").onclick = () => $("helpsheet").classList.remove("show");
+$("shotbtn").onclick = () => $("shots").classList.add("show");
+["shots", "helpsheet"].forEach(id => $(id).onclick = e => { if (e.target === $(id)) $(id).classList.remove("show"); });
+setReel(load("pc_reel", "") === "1", true); setFx(load("pc_fx", "normal"), true); setStab(load("pc_stab", "on"), true);
+if (load("pc_grid", "")) { document.body.classList.add("grid"); $("grid").classList.add("on"); }
+
+// ---------- level ----------
+let levelQ = 0;
+function updateLevel(){ if (!st.q || levelQ) return;
+  levelQ = requestAnimationFrame(() => { levelQ = 0;
+    const r = rotq(st.q, [1, 0, 0]), f = rotq(st.q, [0, 0, -1]);
+    const roll = Math.asin(Math.max(-1, Math.min(1, r[2]))) / D, L = $("level");
+    L.style.display = Math.abs(f[2]) > .8 ? "none" : "block";
+    L.style.transform = `rotate(${Math.abs(roll) < 1.2 ? 0 : -roll}deg)`; L.classList.toggle("ok", Math.abs(roll) < 1.2); }); }
+
+// ---------- record / review ----------
+$("rec").onclick = () => {
+  if (srv.mode === "REVIEW") return toast("First tap Save video or Retake");
+  if (srv.mode === "SAVING") return;
+  st.cmd = srv.mode === "REC" ? "stop" : "rec";
+  srv.mode = st.cmd === "rec" ? "REC" : "SAVING"; document.body.classList.toggle("rec", st.cmd === "rec");
+};
+$("practice").onclick = () => { st.cmd = srv.mode === "PRACTICE" ? "stop" : "practice"; };
+$("save").onclick = () => { st.cmd = "save"; toast("Saving to your computer…"); };
+$("retake").onclick = () => { st.cmd = "retake"; };
+$("watch").onclick = () => { st.cmd = "watch"; };
+
+let toastT; function toast(msg, ms = 2600){ const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = "none", ms); }
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+// ---------- state from Blender ----------
+let lastMsg = "";
+function render(s){
+  const prev = srv.mode; srv = s;
+  document.body.classList.remove("off");
+  const pr = Math.min(1, s.elapsed / Math.max(.1, s.length));
+  document.body.classList.toggle("rec", s.mode === "REC");
+  let label = "LIVE", bar = 0;
+  if (s.mode === "PRACTICE") { label = `PRACTICE ${mmss(s.elapsed)}`; bar = pr; }
+  if (s.mode === "REC") { label = mmss(s.elapsed); bar = pr; }
+  if (s.mode === "SAVING") { label = "SAVING"; bar = s.render; }
+  if (s.mode === "REVIEW") { label = s.playing ? "PLAYBACK" : "REVIEW"; bar = s.playing ? Math.min(1, s.elapsed / Math.max(.1, s.take_len)) : 0; }
+  $("state").textContent = label; $("bar").style.width = (bar * 100) + "%";
+  $("rec").classList.toggle("dim", s.mode === "SAVING" || s.mode === "REVIEW");
+  const review = s.mode === "REVIEW"; document.body.classList.toggle("review", review);
+  ["save", "retake", "watch"].forEach(id => $(id).classList.toggle("hide", !review)); $("watch").disabled = !!s.playing;
+  $("practice").classList.toggle("hide", !(s.mode === "LIVE" || s.mode === "PRACTICE"));
+  $("practice").lastChild.textContent = s.mode === "PRACTICE" ? "Stop" : "Practice";
+  $("saving").classList.toggle("show", s.mode === "SAVING");
+  const p = Math.round(s.render * 100); $("pct").textContent = p + "%"; $("ringfg").setAttribute("stroke-dashoffset", 264 * (1 - s.render));
+  if (s.mode === "SAVING") $("savetext").textContent = s.msg && s.msg.includes("fisheye") ? s.msg : `About ${s.eta >= 60 ? Math.floor(s.eta / 60) + " min " : ""}${s.eta % 60} s left · keep Blender open`;
+  if (prev === "SAVING" && s.mode !== "SAVING") toast(s.video ? "✓ Saved: " + s.video : (s.msg || "Done"), 5000);
+  else if (s.msg && s.msg !== lastMsg && s.mode !== "SAVING") toast(s.msg, 3500);
+  lastMsg = s.msg;
+  if (s.lens_rev !== lensRev) { zAnim = null; zoom = clampZ(+s.lens / Z1); updateLensUI(); lensRev = s.lens_rev; markSpot(s.spot); }
+  if (st.fx === "cinema" && s.af) $("aflabel").textContent = "AF " + s.af + " m";
+  if (fisheyeOK !== s.fisheye_ok) { fisheyeOK = !!s.fisheye_ok; document.querySelector('.md[data-fx="fisheye"]').toggleAttribute("disabled", !fisheyeOK); if (!fisheyeOK && st.fx === "fisheye") setFx("normal", true); }
+  $("hint").textContent = s.hint || "";
+  if (s.rev !== rev) { rev = s.rev; st.hello = true; }
+}
+
+async function poseLoop(){
+  let fails = 0;
+  for (;;) {
+    const t0 = performance.now();
+    try {
+      stepZoom(performance.now());
+      const body = {...st}; st.recenter = false; st.cmd = null; st.hello = false; st.lens = null; st.spot = null; st.focus = null;
+      const r = await fetch("/pose", {method: "POST", headers: {"X-PhoneCam-Key": KEY}, body: JSON.stringify(body)});
+      if (r.status === 403) { $("pair").style.display = "flex"; await new Promise(r => setTimeout(r, 2000)); continue; }
+      const s = await r.json(); fails = 0;
+      if (s.shots) { if (!s.shots.find(x => x.id === st.shot)) st.shot = s.shot;
+        buildShots(s.shots); const cur = s.shots.find(x => x.id === st.shot) || s.shots[0];
+        $("shotname").textContent = cur ? cur.name : "Timeline"; buildSpots(s.spots, s.spot); }
+      if (st.shot === null) st.shot = s.shot;
+      render(s);
+    } catch (e) {
+      if (++fails > 2) { document.body.classList.add("off"); $("state").textContent = "Reconnecting…"; }
+      await new Promise(r => setTimeout(r, 600));
+    }
+    const dt = performance.now() - t0; if (dt < 20) await new Promise(r => setTimeout(r, 20 - dt));
+  }
+}
+async function viewLoop(){
+  let url = null;
+  for (;;) {
+    try {
+      const r = await fetch("/view.jpg?k=" + encodeURIComponent(KEY) + "&t=" + Date.now());
+      if (r.status === 200) { const b = await r.blob(); const u = URL.createObjectURL(b); $("vf").src = u; if (url) URL.revokeObjectURL(url); url = u; }
+      else await new Promise(r => setTimeout(r, 300));
+    } catch (e) { await new Promise(r => setTimeout(r, 600)); }
+    await new Promise(r => setTimeout(r, 12));
+  }
+}
+if (!KEY) $("pair").style.display = "flex";
+</script>
+</body></html>

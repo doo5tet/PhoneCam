@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PhoneCam – Use Your Phone as a Camera in Blender (Free iPhone &amp; Android Add-on)</title>
+<meta name="description" content="PhoneCam is a free Blender add-on that turns your iPhone or Android phone into a handheld virtual camera. Aim, walk, zoom like an iPhone and record smooth camera moves to MP4. No app to install.">
+<meta name="keywords" content="Blender phone camera, use phone as camera Blender, Blender virtual camera, handheld camera Blender, iPhone camera Blender, Android camera Blender, virtual production, camera tracking, Blender add-on, Blender extension, free">
+<link rel="canonical" href="https://doo5tet.github.io/PhoneCam/">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/png" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PhoneCam">
+<meta property="og:title" content="PhoneCam – Turn your phone into a camera for Blender">
+<meta property="og:description" content="Free & open source. Point your iPhone or Android phone to film your Blender scene: aim, walk, iPhone-style zoom, Cinematic and Fisheye looks, record to MP4.">
+<meta property="og:url" content="https://doo5tet.github.io/PhoneCam/">
+<meta property="og:image" content="https://doo5tet.github.io/PhoneCam/assets/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PhoneCam – Turn your phone into a camera for Blender">
+<meta name="twitter:description" content="Free Blender add-on: use your iPhone or Android as a handheld virtual camera. No app to install.">
+<meta name="twitter:image" content="https://doo5tet.github.io/PhoneCam/assets/og.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"PhoneCam","alternateName":"PhoneCam for Blender",
+ "description":"Free Blender add-on that turns your iPhone or Android phone into a handheld virtual camera for Blender, with iPhone-style zoom, Cinematic and Fisheye looks, stabilizer and recording to MP4.",
+ "applicationCategory":"MultimediaApplication","applicationSubCategory":"Blender add-on","operatingSystem":"Windows, macOS, Linux (Blender 4.2+); iOS, Android (browser)",
+ "softwareVersion":"1.0.0","url":"https://doo5tet.github.io/PhoneCam/","downloadUrl":"https://github.com/doo5tet/PhoneCam/releases/latest",
+ "image":"https://doo5tet.github.io/PhoneCam/assets/og.png","screenshot":"https://doo5tet.github.io/PhoneCam/assets/phone-wide.png",
+ "license":"https://www.gnu.org/licenses/gpl-3.0.html","isAccessibleForFree":true,
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+ "author":{"@type":"Person","name":"doo5tet","url":"https://github.com/doo5tet"},
+ "sameAs":["https://github.com/doo5tet/PhoneCam"]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+ {"@type":"Question","name":"Can I use my phone as a camera in Blender?","acceptedAnswer":{"@type":"Answer","text":"Yes. Install the free PhoneCam add-on, click Start in Blender's sidebar and scan the QR code with your iPhone or Android phone. Moving the phone aims Blender's camera, and you can walk, zoom and record."}},
+ {"@type":"Question","name":"Is PhoneCam free?","acceptedAnswer":{"@type":"Answer","text":"Yes. PhoneCam is free forever and open source under the GPL-3.0 license. No ads, no account, no subscription, no watermark."}},
+ {"@type":"Question","name":"Do I need to install an app on my phone?","acceptedAnswer":{"@type":"Answer","text":"No. PhoneCam runs in Safari on iPhone and Chrome on Android. You can add it to your Home Screen for a full-screen app."}},
+ {"@type":"Question","name":"Does PhoneCam need the internet?","acceptedAnswer":{"@type":"Answer","text":"No. Your phone talks to Blender directly over your own Wi-Fi or a phone hotspot. Nothing goes to the cloud."}},
+ {"@type":"Question","name":"Which Blender versions does PhoneCam support?","acceptedAnswer":{"@type":"Answer","text":"Blender 4.2 and newer on macOS, Windows and Linux."}},
+ {"@type":"Question","name":"Why does the phone ask me to install a certificate?","acceptedAnswer":{"@type":"Answer","text":"Phones only share their motion sensors with secure (https) pages. PhoneCam creates a private certificate on your own computer; trusting it once lets your phone connect securely."}}]}
+</script>
+<style>
+  :root{--y:#ffd60a;--t2:rgba(235,235,245,.66);--t3:rgba(235,235,245,.4);--stroke:rgba(255,255,255,.12);--card:rgba(44,44,54,.38)}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;color:#fff;background:#000;font:500 17px/1.55 -apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:var(--y);text-decoration:none} a:hover{text-decoration:underline}
+  .bg{position:fixed;inset:0;z-index:-1;background:radial-gradient(90% 60% at 50% -10%,#3a3550 0%,rgba(10,10,16,0) 60%),radial-gradient(60% 50% at 100% 30%,rgba(255,214,10,.07),transparent 60%),#000}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  nav{position:sticky;top:0;z-index:5;-webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%);background:rgba(0,0,0,.45);border-bottom:.5px solid var(--stroke)}
+  nav .wrap{display:flex;align-items:center;gap:16px;height:58px}
+  nav .brand{display:flex;align-items:center;gap:10px;font-weight:800;color:#fff;font-size:18px}
+  nav .brand img{width:30px;height:30px;border-radius:8px}
+  nav .links{margin-left:auto;display:flex;gap:18px;font-size:15px}
+  nav .links a{color:var(--t2)}
+  .btn{display:inline-flex;align-items:center;gap:8px;height:50px;padding:0 24px;border-radius:25px;font-weight:700;font-size:17px;border:.5px solid var(--stroke)}
+  .btn.primary{background:var(--y);color:#000;border-color:var(--y)} .btn.primary:hover{text-decoration:none;filter:brightness(1.05)}
+  .btn.glass{background:var(--card);color:#fff;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)} .btn.glass:hover{text-decoration:none}
+  header{text-align:center;padding:70px 0 30px}
+  header .icon{width:96px;height:96px;border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  h1{font-size:clamp(34px,6vw,62px);line-height:1.05;letter-spacing:-.03em;margin:22px 0 14px;font-weight:800}
+  h1 span{background:linear-gradient(90deg,#fff,#ffe58a);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lead{font-size:clamp(18px,2.4vw,22px);color:var(--t2);max-width:760px;margin:0 auto 26px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .meta{color:var(--t3);font-size:14px;margin-top:14px}
+  .hero{margin:36px auto 0;max-width:980px} .hero img{width:100%;height:auto;display:block}
+  section{padding:56px 0} h2{font-size:clamp(28px,4vw,40px);letter-spacing:-.02em;margin:0 0 10px} .sec-lead{color:var(--t2);margin:0 0 26px;max-width:720px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .card{background:var(--card);border:.5px solid var(--stroke);border-radius:22px;padding:20px;-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.1)}
+  .card h3{margin:6px 0 6px;font-size:19px} .card p{margin:0;color:var(--t2);font-size:15.5px}
+  .emoji{font-size:26px}
+  .steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+  .step{counter-increment:s;position:relative;padding-top:56px}
+  .step::before{content:counter(s);position:absolute;top:18px;left:20px;width:28px;height:28px;border-radius:50%;background:var(--y);color:#000;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .split{display:grid;grid-template-columns:1.4fr 1fr;gap:26px;align-items:center}
+  .split img{width:100%;height:auto;border-radius:18px;border:.5px solid var(--stroke)}
+  .phones{display:flex;gap:16px;justify-content:center} .phones img{width:46%;max-width:280px;height:auto}
+  ol.howto{padding-left:22px;margin:10px 0 0;color:var(--t2)} ol.howto li{margin:0 0 8px} ol.howto b{color:#fff}
+  table{width:100%;border-collapse:collapse;font-size:15.5px} td{padding:11px 12px;border-bottom:.5px solid var(--stroke);vertical-align:top} td:first-child{color:#fff;font-weight:700;white-space:nowrap;width:38%} td:last-child{color:var(--t2)}
+  kbd{font:700 13px/1 ui-monospace,Menlo,monospace;background:rgba(255,255,255,.1);border:.5px solid var(--stroke);border-radius:6px;padding:3px 6px}
+  details{background:var(--card);border:.5px solid var(--stroke);border-radius:18px;padding:16px 18px;margin:0 0 10px}
+  summary{cursor:pointer;font-weight:700;list-style:none} summary::-webkit-details-marker{display:none} summary::after{content:"+";float:right;color:var(--t3);font-weight:400}
+  details[open] summary::after{content:"–"} details p{color:var(--t2);margin:10px 0 0}
+  .tabs{display:inline-flex;gap:4px;padding:4px;border-radius:14px;background:var(--card);border:.5px solid var(--stroke);margin:0 0 14px}
+  .tab{border:0;background:none;color:var(--t2);font:inherit;font-weight:700;padding:8px 16px;border-radius:10px;cursor:pointer} .tab.on{background:rgba(255,255,255,.14);color:#fff}
+  .hidden{display:none}
+  footer{padding:40px 0 60px;color:var(--t3);font-size:14px;text-align:center;border-top:.5px solid var(--stroke)}
+  @media (max-width:760px){.split{grid-template-columns:1fr} nav .links{display:none} td:first-child{white-space:normal}}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<nav><div class="wrap"><a class="brand" href="#"><img src="assets/icon.png" alt="">PhoneCam</a>
+  <div class="links"><a href="#features">Features</a><a href="#install">Install</a><a href="#connect">Connect</a><a href="#use">How to film</a><a href="#faq">FAQ</a><a href="https://github.com/doo5tet/PhoneCam">GitHub</a></div></div></nav>
+
+<header class="wrap">
+  <img class="icon" src="assets/icon.png" alt="PhoneCam app icon" width="96" height="96">
+  <h1>Turn your phone into a <span>camera for Blender</span></h1>
+  <p class="lead">PhoneCam is a free Blender add-on that makes your iPhone or Android phone a handheld virtual camera. Point it to aim, walk, zoom like an iPhone — and record smooth, real-feeling camera moves straight to MP4.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/doo5tet/PhoneCam/releases/latest">⬇ Download free</a>
+    <a class="btn glass" href="#install">Step-by-step guide</a>
+  </div>
+  <p class="meta">Blender 4.2+ · macOS, Windows, Linux · iPhone &amp; Android · No app to install · Free &amp; open source</p>
+  <div class="hero"><img src="assets/phone-wide.png" alt="PhoneCam on a phone: live Blender preview with lens buttons, record button and Video, Cinematic and Fisheye modes" width="1600" height="809"></div>
+</header>
+
+<main>
+<section id="features" class="wrap">
+  <h2>Film your 3D scene like real life</h2>
+  <p class="sec-lead">Hand-keyed cameras look robotic. A real handheld camera has life. PhoneCam gives Blender that life, using the phone you already own.</p>
+  <div class="grid">
+    <div class="card"><div class="emoji">📱</div><h3>No app to install</h3><p>Runs in Safari or Chrome. Scan a QR code and you're filming.</p></div>
+    <div class="card"><div class="emoji">🎥</div><h3>Your phone is the camera</h3><p>Turn and tilt to aim. The on-screen stick walks the camera; ▲▼ raises and lowers it.</p></div>
+    <div class="card"><div class="emoji">🔍</div><h3>iPhone-style zoom</h3><p><b>.5 · 1× · 2 · 3 · 5</b> lens buttons that glide, pinch-to-zoom and a zoom dial.</p></div>
+    <div class="card"><div class="emoji">🎬</div><h3>Video, Cinematic, Fisheye</h3><p>Shallow depth of field with autofocus and tap-to-focus, or a super-wide fisheye.</p></div>
+    <div class="card"><div class="emoji">✋</div><h3>Stabilizer</h3><p>On, Action (gimbal-smooth) or Off for raw handheld energy.</p></div>
+    <div class="card"><div class="emoji">📐</div><h3>16:9 or 9:16</h3><p>Wide for YouTube, vertical for Reels, TikTok and Shorts.</p></div>
+    <div class="card"><div class="emoji">⏺️</div><h3>Record, review, save</h3><p>Watch the take on your phone, then Save or Retake. MP4 lands in your Videos folder.</p></div>
+    <div class="card"><div class="emoji">🧈</div><h3>Always smooth</h3><p>Records full-speed phone motion and rebuilds the path, so heavy scenes never stutter. Motion blur included.</p></div>
+    <div class="card"><div class="emoji">🎯</div><h3>Uses your scene</h3><p>Timeline markers become shots; every camera becomes a one-tap camera spot.</p></div>
+    <div class="card"><div class="emoji">🔒</div><h3>Private by design</h3><p>Direct over your own Wi-Fi. No account, no cloud, no tracking, no internet needed.</p></div>
+    <div class="card"><div class="emoji">🚗</div><h3>Ride along</h3><p>Film from inside a moving car, horse or spaceship in your scene.</p></div>
+    <div class="card"><div class="emoji">💸</div><h3>Free forever</h3><p>Open source (GPL-3.0). No ads, no subscription, no watermark.</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>Three steps</h2>
+  <div class="steps">
+    <div class="card step"><h3>Install the add-on</h3><p>Download the zip and drag it into Blender 4.2 or newer.</p></div>
+    <div class="card step"><h3>Click Start</h3><p>Press <kbd>N</kbd> in the 3D Viewport, open the <b>PhoneCam</b> tab, click <b>Start PhoneCam</b>.</p></div>
+    <div class="card step"><h3>Scan &amp; film</h3><p>Scan the QR code with your phone's camera. First time: a 1-minute setup on the phone.</p></div>
+  </div>
+</section>
+
+<section id="install" class="wrap split">
+  <div>
+    <h2>Install in Blender</h2>
+    <p class="sec-lead">PhoneCam is a Blender extension for Blender 4.2, 4.3, 4.4, 4.5 and 5.x.</p>
+    <ol class="howto">
+      <li>Download <b>phonecam-1.0.0.zip</b> from <a href="https://github.com/doo5tet/PhoneCam/releases/latest">Releases</a>. Don't unzip it.</li>
+      <li><b>Drag the zip into the Blender window</b> — or <b>Edit → Preferences → Get Extensions → ⌄ → Install from Disk…</b></li>
+      <li>Make sure <b>PhoneCam</b> is ticked.</li>
+      <li>In the 3D Viewport press <kbd>N</kbd> → <b>PhoneCam</b> tab → <b>Start PhoneCam</b>.</li>
+      <li>If your computer asks to allow incoming connections for Blender, click <b>Allow</b>.</li>
+    </ol>
+  </div>
+  <img src="assets/blender-panel.png" alt="PhoneCam panel in Blender's sidebar with a QR code to scan" loading="lazy" width="1400" height="848">
+</section>
+
+<section id="connect" class="wrap split">
+  <div>
+    <h2>Connect your phone</h2>
+    <p class="sec-lead">Phone and computer on the <b>same Wi-Fi</b> (a phone hotspot works too). Scan the QR code. The first time, your phone needs to trust your own computer — phones only share motion sensors with secure pages.</p>
+    <div class="tabs"><button class="tab on" data-os="ios">iPhone / iPad</button><button class="tab" data-os="android">Android</button></div>
+    <ol class="howto" data-for="ios">
+      <li>Tap <b>Download certificate</b> → <b>Allow</b> → <b>Close</b>.</li>
+      <li><b>Settings → Profile Downloaded → Install</b> (passcode) → <b>Install → Done</b>.</li>
+      <li><b>Settings → General → About → Certificate Trust Settings</b> → switch on <b>PhoneCam on …</b> → <b>Continue</b>.</li>
+      <li>Back in Safari, the camera opens by itself. Tip: <b>Share → Add to Home Screen</b>.</li>
+    </ol>
+    <ol class="howto hidden" data-for="android">
+      <li>Tap <b>Download certificate</b>.</li>
+      <li>Open <b>Settings</b>, search <b>“CA certificate”</b> → <b>Install a certificate → CA certificate → Install anyway</b> → pick <b>PhoneCam-CA.crt</b>.</li>
+      <li>Back in Chrome, the camera opens by itself.</li>
+    </ol>
+  </div>
+  <div class="phones"><img src="assets/phone-start.png" alt="PhoneCam start screen: choose wide or vertical video" loading="lazy"><img src="assets/phone-vertical.png" alt="PhoneCam vertical 9:16 mode with Cinematic focus box" loading="lazy"></div>
+</section>
+
+<section id="use" class="wrap">
+  <h2>How to film</h2>
+  <div class="card" style="padding:6px 8px"><table>
+    <tr><td>Move / tilt your phone</td><td>Aim the camera</td></tr>
+    <tr><td>WALK stick</td><td>Move forward, back, left, right</td></tr>
+    <tr><td>UP / DOWN</td><td>Raise or lower the camera</td></tr>
+    <tr><td>.5 · 1× · 2 · 3 · 5</td><td>Glide to a lens, like the iPhone camera</td></tr>
+    <tr><td>Pinch · slide the lens buttons</td><td>Smooth zoom</td></tr>
+    <tr><td>VIDEO · CINEMATIC · FISHEYE</td><td>Change the look. In Cinematic, tap the picture to choose what is sharp</td></tr>
+    <tr><td>⊙ Reset aim</td><td>The camera points where your phone points</td></tr>
+    <tr><td>▭ / ▯</td><td>Wide 16:9 or vertical 9:16</td></tr>
+    <tr><td>✋ Stabilizer</td><td>On → Action → Off</td></tr>
+    <tr><td>Practice</td><td>Rehearse without recording</td></tr>
+    <tr><td>Red button</td><td>Record, then Watch, Retake or Save video</td></tr>
+  </table></div>
+  <p class="sec-lead" style="margin-top:18px"><b>Shots</b> come from timeline markers (<kbd>M</kbd> in the timeline). <b>Camera spots</b> are the cameras in your scene. Every take is also kept as keyframes on the <b>PhoneCam</b> camera, ready to tweak.</p>
+</section>
+
+<section id="troubleshooting" class="wrap">
+  <h2>Troubleshooting</h2>
+  <details><summary>The QR link doesn't open or says it can't connect</summary><p>Phone and computer must be on the same Wi-Fi. Café, school and guest networks often block devices from seeing each other — use your phone's hotspot instead. Allow Blender through your firewall. If your computer has several networks (VPN, virtual machines), pick the right one in the PhoneCam panel's <b>Network</b> menu.</p></details>
+  <details><summary>Safari says “This connection is not private”</summary><p>Finish the one-time certificate setup, including <b>Certificate Trust Settings</b> on iPhone.</p></details>
+  <details><summary>The controls won't turn sideways</summary><p>Turn off your phone's rotation lock in Control Center, or choose <b>Vertical video</b>.</p></details>
+  <details><summary>Fisheye is greyed out</summary><p>Fisheye uses ffmpeg. Install it (<kbd>brew install ffmpeg</kbd> on macOS, <kbd>winget install ffmpeg</kbd> on Windows, <kbd>sudo apt install ffmpeg</kbd> on Linux) and restart Blender.</p></details>
+  <details><summary>The live preview is slow</summary><p>Big scenes draw slower. The saved video is always smooth — the preview is only for framing. Keep “Lighter viewport while filming” on.</p></details>
+</section>
+
+<section id="faq" class="wrap">
+  <h2>FAQ</h2>
+  <details open><summary>Can I use my phone as a camera in Blender?</summary><p>Yes — that's exactly what PhoneCam does. Install the add-on, click Start, scan the QR code with your iPhone or Android phone, and the phone becomes Blender's camera.</p></details>
+  <details><summary>Is PhoneCam really free?</summary><p>Yes. Free forever and open source under GPL-3.0. No ads, no account, no paid tier, no watermark.</p></details>
+  <details><summary>Do I need to install an app on my phone?</summary><p>No. It runs in Safari (iPhone) or Chrome (Android). Add it to your Home Screen for a full-screen app.</p></details>
+  <details><summary>Does it need the internet?</summary><p>No. Your phone talks to Blender directly over your local Wi-Fi. Nothing goes to the cloud.</p></details>
+  <details><summary>Which Blender versions and computers?</summary><p>Blender 4.2 and newer on macOS, Windows and Linux.</p></details>
+  <details><summary>Why does the phone ask me to install a certificate?</summary><p>Phones only share motion sensors with secure (https) pages. PhoneCam makes a private certificate on your own computer; trusting it once lets your phone connect securely. The QR code also carries a private pairing key, so other people on the same Wi-Fi can't take over your camera.</p></details>
+  <details><summary>Where are my videos saved?</summary><p>In Movies/PhoneCam (macOS) or Videos/PhoneCam (Windows, Linux) — click <b>Open videos folder</b> in the PhoneCam tab. You can change it under Options.</p></details>
+</section>
+
+<section class="wrap" style="text-align:center">
+  <h2>Ready to film?</h2>
+  <p class="sec-lead" style="margin:0 auto 22px">Free, open source, and made for everyone who wants their Blender camera to feel real.</p>
+  <div class="cta"><a class="btn primary" href="https://github.com/doo5tet/PhoneCam/releases/latest">⬇ Download PhoneCam</a><a class="btn glass" href="https://github.com/doo5tet/PhoneCam">★ Star on GitHub</a></div>
+</section>
+</main>
+
+<footer><div class="wrap">PhoneCam is free software under the <a href="https://github.com/doo5tet/PhoneCam/blob/main/LICENSE">GPL-3.0</a>. Not affiliated with the Blender Foundation or Apple. Blender is a trademark of the Blender Foundation.<br>
+<a href="https://github.com/doo5tet/PhoneCam">GitHub</a> · <a href="https://github.com/doo5tet/PhoneCam/issues">Report a problem</a></div></footer>
+<script>
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll("[data-for]").forEach(d => d.classList.toggle("hidden", d.dataset.for !== t.dataset.os));
+});
+if (/android/i.test(navigator.userAgent)) document.querySelector('.tab[data-os="android"]').click();
+</script>
+</body>
+</html>

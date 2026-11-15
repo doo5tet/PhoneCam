@@ -1,0 +1,10 @@
+{
+  "name": "PhoneCam",
+  "short_name": "PhoneCam",
+  "description": "Your phone is a camera for Blender",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]
+}

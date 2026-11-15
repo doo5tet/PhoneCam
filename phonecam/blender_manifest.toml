@@ -1,0 +1,22 @@
+schema_version = "1.0.0"
+
+id = "phonecam"
+version = "1.0.0"
+name = "PhoneCam"
+tagline = "Turn your phone into a handheld camera for Blender"
+maintainer = "doo5tet"
+type = "add-on"
+website = "https://doo5tet.github.io/PhoneCam/"
+tags = ["Camera", "Animation", "Tracking"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 doo5tet", "2016-2024 Lars Heuer (segno QR code library, BSD-3-Clause)"]
+
+[permissions]
+network = "Local server so your phone can connect over your Wi-Fi"
+files = "Saves recorded videos and a local phone certificate"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "/.git/", "*.zip"]
