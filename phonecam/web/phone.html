@@ -99,9 +99,31 @@
   #afbox{position:fixed;width:76px;height:76px;margin:-38px 0 0 -38px;border:1.5px solid var(--y);display:none;pointer-events:none;z-index:3;transition:width .25s,height .25s,margin .25s}
   #afbox.small{width:60px;height:60px;margin:-30px 0 0 -30px}
   #afbox b{position:absolute;left:100%;top:-1px;margin-left:6px;font-size:11px;color:var(--y);white-space:nowrap;font-weight:700}
-  #level{position:fixed;left:50%;top:50%;width:110px;margin-left:-55px;pointer-events:none;z-index:2;display:none}
-  #level i{position:absolute;left:0;right:0;top:0;border-top:1.5px solid rgba(255,255,255,.6)}
-  #level.ok i{border-color:var(--y)}
+  /* artificial horizon */
+  #horizon{position:fixed;left:50%;top:50%;width:300px;height:220px;margin:-110px 0 0 -150px;pointer-events:none;z-index:2;display:none}
+  body.nohz #horizon{display:none!important}
+  #horizon svg{overflow:visible}
+  #horizon .hz-main{stroke:rgba(255,255,255,.75);stroke-width:1.5}
+  #horizon .hz-tick{stroke:rgba(255,255,255,.45);stroke-width:1}
+  #horizon text{fill:rgba(255,255,255,.6);font:600 9px -apple-system,system-ui,sans-serif}
+  #horizon .hz-ref{fill:none;stroke:#fff;stroke-width:2;stroke-linejoin:round}
+  #horizon.ok .hz-main,#horizon.ok .hz-ref{stroke:var(--y)}
+  #hz-num{position:absolute;left:0;right:0;top:calc(50% + 22px);text-align:center;font:700 10px -apple-system,system-ui,sans-serif;color:rgba(255,255,255,.7);letter-spacing:.06em}
+  #lat{font-size:11px;color:var(--t2);font-weight:600}
+  /* settings sheet */
+  .card h4{margin:16px 0 8px;font-size:12px;letter-spacing:.1em;color:var(--t2);font-weight:800;text-transform:uppercase}
+  .seg{display:flex;flex-wrap:wrap;gap:6px}
+  .seg button{height:36px;padding:0 13px;border-radius:12px;background:rgba(255,255,255,.08);border:.5px solid var(--stroke);font-weight:700;font-size:14px;color:var(--t2)}
+  .seg button.on{background:var(--y);color:#000;border-color:var(--y)}
+  .small{font-size:13px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 2px;font-weight:600}
+  .sw{appearance:none;-webkit-appearance:none;width:50px;height:30px;border-radius:15px;background:rgba(255,255,255,.18);position:relative;transition:background .2s;flex:none;margin:0}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .sw:checked{background:#30d158} .sw:checked::after{transform:translateX(20px)}
+  .sl{padding:6px 2px}
+  .sl .lab{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px} .sl .lab b{color:var(--y)}
+  .sl input{width:100%;accent-color:#ffd60a;touch-action:pan-x}
+  .netinfo{font-size:12.5px;color:var(--t2);margin:14px 0 0}
   #toast{position:fixed;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 50px);transform:translateX(-50%);z-index:9;display:none;max-width:86vw;text-align:center;padding:10px 16px;border-radius:18px;font-weight:600;font-size:14px}
   .sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:8;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
   .sheet.show{display:flex}
@@ -151,22 +173,22 @@
 </head><body class="off">
 
 <div id="vfwrap"><img id="vf" alt=""><div id="frame"></div><div id="hint"></div></div>
-<div id="afbox"><b id="aflabel"></b></div><div id="level"><i></i></div><div id="zread"></div>
+<div id="afbox"><b id="aflabel"></b></div><div id="zread"></div>
+<div id="horizon"><svg viewBox="-150 -110 300 220" width="300" height="220"><g id="hz-rot"><g id="hz-pitch"></g></g>
+  <path class="hz-ref" d="M-46 0 H-14 L-7 7 L0 0 L7 7 L14 0 H46"/></svg><div id="hz-num"></div></div>
 <div id="bar"></div>
 
 <div class="hud">
   <div class="top safe-t">
-    <div class="cap glass" id="status"><span class="dot"></span><span id="state">Connecting</span></div>
+    <div class="cap glass" id="status"><span class="dot"></span><span id="state">Connecting</span><span id="lat"></span></div>
     <button class="cap glass" id="shotbtn" aria-label="Choose shot"><small>SHOT</small><span id="shotname">Timeline</span>
       <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <div class="icons">
       <button class="ib glass" id="fmt" aria-label="Wide or vertical video">
         <svg id="fmtico" width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="5.5" width="16" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button>
-      <button class="ib glass on" id="stab" aria-label="Stabilizer">
-        <svg width="20" height="20" viewBox="0 0 20 20"><path d="M6 10.5V5.8a1.2 1.2 0 0 1 2.4 0V9m0-4.6V4a1.2 1.2 0 0 1 2.4 0v5m0-4a1.2 1.2 0 0 1 2.4 0v4.6m0-2.6a1.2 1.2 0 0 1 2.4 0v4.4c0 3-2.3 5.6-5.4 5.6-2 0-3.3-.9-4.4-2.6L4.2 11.6a1.3 1.3 0 0 1 2-1.6l.8 1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="badge" id="stabbadge">ON</span></button>
-      <button class="ib glass" id="grid" aria-label="Grid">
-        <svg width="20" height="20" viewBox="0 0 20 20"><path d="M7 3v14M13 3v14M3 7h14M3 13h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+      <button class="ib glass" id="gear" aria-label="Camera rig and settings">
+        <svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.4M10 15.8v2.4M1.8 10h2.4M15.8 10h2.4M4.2 4.2l1.7 1.7M14.1 14.1l1.7 1.7M4.2 15.8l1.7-1.7M14.1 5.9l1.7-1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span class="badge" id="rigbadge">HH</span></button>
       <button class="ib glass" id="center" aria-label="Reset aim">
         <svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
       <button class="ib glass" id="help" aria-label="Help">
@@ -216,8 +238,27 @@
   <li><b>Practice</b> plays the shot without recording. The red button records; the video saves to your computer.</li>
   <li>After a take: <b>Watch</b>, <b>Retake</b> or <b>Save video</b>.</li>
   <li>Camera spots (top) jump to the cameras in your Blender scene.</li>
-  <li>✋ <b>Stabilizer</b>: On → Action (extra smooth) → Off.</li></ul>
+  <li>⚙ <b>Rig</b>: Handheld, Dolly, Crane, Cinematic or Raw · Tripod (rotation only) · Sensitivity, Smoothing, Position scale · keyframe rate · AR position tracking.</li></ul>
   <button class="btn primary glass" id="helpok" style="margin:14px auto 0">Got it</button></div></div>
+
+<div class="sheet" id="settings"><div class="card glass">
+  <h3>Camera rig</h3>
+  <div class="seg" id="rigs"></div>
+  <p class="muted small" id="rigdesc" style="margin-top:8px"></p>
+  <label class="row"><span>Tripod <span class="muted small">— rotation only, the camera stays put</span></span><input type="checkbox" class="sw" id="tripod"></label>
+  <div class="sl"><div class="lab"><span>Sensitivity</span><b id="sensv"></b></div><input type="range" id="sens" min="0.25" max="3" step="0.05"></div>
+  <div class="sl"><div class="lab"><span>Smoothing</span><b id="smoothv"></b></div><input type="range" id="smooth" min="0" max="1" step="0.01"></div>
+  <div class="sl"><div class="lab"><span>Position scale</span><b id="pscalev"></b></div><input type="range" id="pscale" min="-1.3" max="1.7" step="0.01"></div>
+  <h4>Keyframe rate</h4>
+  <div class="seg" id="krates"></div>
+  <h4>Position tracking (6DoF)</h4>
+  <button class="btn glass" id="arbtn" style="width:100%;justify-content:center">Start AR tracking</button>
+  <p class="muted small" id="arnote" style="margin-top:8px"></p>
+  <h4>Display</h4>
+  <label class="row"><span>Artificial horizon</span><input type="checkbox" class="sw" id="hzsw" checked></label>
+  <label class="row"><span>Grid</span><input type="checkbox" class="sw" id="gridsw"></label>
+  <p class="netinfo" id="netinfo"></p>
+  <button class="btn primary glass" id="setok" style="margin:14px auto 0">Done</button></div></div>
 
 <div id="start">
   <div class="logo"><svg width="46" height="46" viewBox="0 0 46 46"><rect x="4" y="12" width="28" height="22" rx="6" fill="none" stroke="#fff" stroke-width="2.6"/><path d="m32 20 9-5v16l-9-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/><circle cx="18" cy="23" r="5" fill="#ffd60a"/></svg></div>
@@ -241,7 +282,8 @@ const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 let KEY = params.get("k") || "";
 try { if (KEY) localStorage.setItem("pc_key", KEY); else KEY = localStorage.getItem("pc_key") || ""; } catch (e) {}
-const st = {q:null, jx:0, jy:0, vz:0, lens:null, recenter:false, cmd:null, shot:null, hello:true, reel:false, fx:"normal", stab:"on", focus:null};
+const st = {q:null, jx:0, jy:0, vz:0, lens:null, recenter:false, cmd:null, shot:null, hello:true, reel:false, fx:"normal", focus:null,
+            rig:"handheld", sens:1, smooth:0.15, pscale:1, tripod:false, krate:0, pos:null, xr:false, rtt:null};
 let srv = {mode:"LIVE"}, lensRev = -1, rev = "", SHOTS = [], fisheyeOK = true;
 const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 const load = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
@@ -276,13 +318,13 @@ const qax = (x, y, z, a) => { const s = Math.sin(a/2); return [Math.cos(a/2), x*
 const rotq = (q, v) => { const p = qmul(qmul(q, [0, ...v]), [q[0], -q[1], -q[2], -q[3]]); return [p[1], p[2], p[3]]; };
 let side = 90, physLandscape = false;  // gravity tells how the phone is really held (works with rotation lock on)
 addEventListener("deviceorientation", e => {
-  if (e.alpha == null) return;
+  if (e.alpha == null || st.xr) return;  // AR tracking drives the camera while it runs
   const q0 = qmul(qmul(qax(0,0,1,e.alpha*D), qax(1,0,0,e.beta*D)), qax(0,1,0,e.gamma*D));
   const xz = rotq(q0, [1,0,0])[2], yz = rotq(q0, [0,1,0])[2];
   if (Math.abs(xz) > 0.55 && Math.abs(xz) > Math.abs(yz)) { side = xz > 0 ? 90 : -90; physLandscape = true; }
   else if (Math.abs(yz) > 0.55) physLandscape = false;
   st.q = st.reel ? q0 : qmul(q0, qax(0,0,1,-side*D));
-  updateTurn(); updateLevel();
+  updateTurn(); updateHorizon();
 });
 function updateTurn(){
   const portrait = innerHeight > innerWidth; let msg = "";
@@ -319,7 +361,7 @@ async function startCam(){
     }
     try { await navigator.wakeLock?.request("screen"); } catch (e) {}
     $("start").style.display = "none"; document.body.classList.add("started"); updateTurn();
-    st.recenter = true; poseLoop(); viewLoop();
+    st.recenter = true; startNet();
     if (!load("pc_helped", "")) { $("helpsheet").classList.add("show"); store("pc_helped", "1"); }
   } catch (e) { $("err").textContent = e.message; }
 }
@@ -403,28 +445,100 @@ function setFx(fx, quiet){
 document.querySelectorAll(".md").forEach(b => b.onclick = () => {
   if (!(srv.mode === "LIVE" || srv.mode === "PRACTICE")) return toast("Change this before you record"); setFx(b.dataset.fx); });
 
-// ---------- stabilizer, grid, aim, help ----------
-const STAB = {on: "ON", action: "MAX", off: "OFF"};
-function setStab(v, quiet){ st.stab = v; $("stabbadge").textContent = STAB[v]; $("stab").classList.toggle("on", v !== "off"); store("pc_stab", v);
-  if (!quiet) toast({on: "Stabilizer on: smooths small shakes", action: "Action mode: extra smooth, like a gimbal", off: "Stabilizer off: raw handheld"}[v]); }
-$("stab").onclick = () => { if (!(srv.mode === "LIVE" || srv.mode === "PRACTICE")) return toast("Change this before you record"); setStab({on: "action", action: "off", off: "on"}[st.stab]); };
-$("grid").onclick = () => { const on = !document.body.classList.contains("grid"); document.body.classList.toggle("grid", on); $("grid").classList.toggle("on", on); store("pc_grid", on ? "1" : ""); };
+// ---------- camera rig: presets, tripod, sliders, keyframe rate (sent to Blender, remembered on the phone) ----------
+const RIGS = {handheld: {n: "Handheld", b: "HH", smooth: 0.15, d: "Natural hand-held feel with light smoothing."},
+              dolly: {n: "Dolly", b: "DOL", smooth: 0.45, d: "Glides like it's on rails: level horizon, no height changes, smooth."},
+              crane: {n: "Crane", b: "CRN", smooth: 0.5, d: "Big smooth vertical moves (UP/DOWN and AR height are doubled), level horizon."},
+              cinematic: {n: "Cinematic", b: "CIN", smooth: 0.65, d: "Very smooth and level, like a gimbal."},
+              raw: {n: "Raw", b: "RAW", smooth: 0, d: "Exactly what your hand does. No smoothing at all."}};
+const KR = [[0, "Scene"], [24, "24"], [25, "25"], [30, "30"], [60, "60"]];
+function saveSet(){ store("pc_set", JSON.stringify({rig: st.rig, sens: st.sens, smooth: st.smooth, pscale: st.pscale, tripod: st.tripod, krate: st.krate})); }
+function paintSet(){
+  document.querySelectorAll("#rigs button").forEach(b => b.classList.toggle("on", b.dataset.r === st.rig));
+  document.querySelectorAll("#krates button").forEach(b => b.classList.toggle("on", +b.dataset.k === st.krate));
+  $("rigdesc").textContent = RIGS[st.rig].d;
+  $("tripod").checked = st.tripod;
+  $("sens").value = st.sens; $("sensv").textContent = (+st.sens.toFixed(2)) + "×";
+  $("smooth").value = st.smooth; $("smoothv").textContent = Math.round(st.smooth * 100) + "%";
+  $("pscale").value = Math.log10(st.pscale); $("pscalev").textContent = (st.pscale < 1 ? st.pscale.toFixed(2) : st.pscale.toFixed(1)) + "×";
+  $("rigbadge").textContent = st.tripod ? "TRI" : RIGS[st.rig].b;
+}
+Object.entries(RIGS).forEach(([k, r]) => { const b = document.createElement("button"); b.dataset.r = k; b.textContent = r.n;
+  b.onclick = () => { st.rig = k; st.smooth = r.smooth; paintSet(); saveSet(); }; $("rigs").appendChild(b); });
+KR.forEach(([k, n]) => { const b = document.createElement("button"); b.dataset.k = k; b.textContent = n;
+  b.onclick = () => { st.krate = k; paintSet(); saveSet(); }; $("krates").appendChild(b); });
+$("tripod").onchange = () => { st.tripod = $("tripod").checked; paintSet(); saveSet(); };
+$("sens").oninput = () => { st.sens = +$("sens").value; paintSet(); saveSet(); };
+$("smooth").oninput = () => { st.smooth = +$("smooth").value; paintSet(); saveSet(); };
+$("pscale").oninput = () => { st.pscale = Math.round(Math.pow(10, +$("pscale").value) * 100) / 100; paintSet(); saveSet(); };
+$("hzsw").onchange = () => { document.body.classList.toggle("nohz", !$("hzsw").checked); store("pc_hz", $("hzsw").checked ? "" : "off"); };
+$("gridsw").onchange = () => { document.body.classList.toggle("grid", $("gridsw").checked); store("pc_grid", $("gridsw").checked ? "1" : ""); };
+$("gear").onclick = () => { if (!(srv.mode === "LIVE" || srv.mode === "PRACTICE")) return toast("Change the rig before you record"); paintSet(); $("settings").classList.add("show"); };
+$("setok").onclick = () => $("settings").classList.remove("show");
+try { const saved = JSON.parse(load("pc_set", "{}")); ["rig", "sens", "smooth", "pscale", "tripod", "krate"].forEach(k => { if (k in saved) st[k] = saved[k]; }); } catch (e) {}
+if (!RIGS[st.rig]) st.rig = "handheld";
+paintSet();
+if (load("pc_hz", "") === "off") { document.body.classList.add("nohz"); $("hzsw").checked = false; }
+if (load("pc_grid", "")) { document.body.classList.add("grid"); $("gridsw").checked = true; }
+
+// ---------- AR position tracking (6DoF): WebXR, e.g. Android Chrome ----------
+let xr = null;
+async function arSupported(){ try { return !!(navigator.xr && await navigator.xr.isSessionSupported("immersive-ar")); } catch (e) { return false; } }
+arSupported().then(ok => {
+  $("arbtn").style.display = ok ? "" : "none";
+  $("arnote").textContent = ok ? "Walk around for real: the camera moves with your phone. Position scale sets how far it travels."
+    : "This browser doesn't offer AR position tracking (iPhone Safari doesn't). Rotation, the WALK stick and UP/DOWN work everywhere.";
+});
+$("arbtn").onclick = async () => {
+  if (xr) { xr.session.end(); return; }
+  try {
+    const canvas = document.createElement("canvas"), gl = canvas.getContext("webgl", {xrCompatible: true});
+    const session = await navigator.xr.requestSession("immersive-ar", {requiredFeatures: ["local"], optionalFeatures: ["dom-overlay"], domOverlay: {root: document.body}});
+    session.updateRenderState({baseLayer: new XRWebGLLayer(session, gl)});
+    const ref = await session.requestReferenceSpace("local");
+    xr = {session, ref}; st.xr = true; st.recenter = true; document.body.classList.add("xr");
+    $("arbtn").textContent = "Stop AR tracking"; $("settings").classList.remove("show"); toast("AR tracking on: walk around to move the camera");
+    const RX = qax(1, 0, 0, Math.PI / 2);  // WebXR is y-up; Blender is z-up
+    session.requestAnimationFrame(function frame(t, f){
+      const pose = f.getViewerPose(ref);
+      if (pose) { const p = pose.transform.position, o = pose.transform.orientation;
+        st.pos = [p.x, -p.z, p.y]; st.q = qmul(RX, [o.w, o.x, o.y, o.z]); updateHorizon(); }
+      const L = session.renderState.baseLayer; gl.bindFramebuffer(gl.FRAMEBUFFER, L.framebuffer); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      session.requestAnimationFrame(frame);
+    });
+    session.addEventListener("end", () => { xr = null; st.xr = false; st.pos = null; st.recenter = true; document.body.classList.remove("xr");
+      $("arbtn").textContent = "Start AR tracking"; toast("AR tracking off"); });
+  } catch (e) { toast("AR tracking couldn't start: " + e.message, 4000); }
+};
+
 $("center").onclick = () => { st.recenter = true; toast("Aim reset — the camera points where your phone points"); };
 $("help").onclick = () => $("helpsheet").classList.add("show");
 $("helpok").onclick = () => $("helpsheet").classList.remove("show");
 $("shotbtn").onclick = () => $("shots").classList.add("show");
-["shots", "helpsheet"].forEach(id => $(id).onclick = e => { if (e.target === $(id)) $(id).classList.remove("show"); });
-setReel(load("pc_reel", "") === "1", true); setFx(load("pc_fx", "normal"), true); setStab(load("pc_stab", "on"), true);
-if (load("pc_grid", "")) { document.body.classList.add("grid"); $("grid").classList.add("on"); }
+["shots", "helpsheet", "settings"].forEach(id => $(id).onclick = e => { if (e.target === $(id)) $(id).classList.remove("show"); });
+setReel(load("pc_reel", "") === "1", true); setFx(load("pc_fx", "normal"), true);
 
-// ---------- level ----------
-let levelQ = 0;
-function updateLevel(){ if (!st.q || levelQ) return;
-  levelQ = requestAnimationFrame(() => { levelQ = 0;
+// ---------- artificial horizon: pitch ladder + roll, turns yellow when level ----------
+(function buildHorizon(){
+  const g = $("hz-pitch"), K = 3, ns = "http://www.w3.org/2000/svg";
+  const add = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); g.appendChild(e); return e; };
+  add("line", {x1: -150, y1: 0, x2: 150, y2: 0, class: "hz-main"});
+  [-30, -20, -10, 10, 20, 30].forEach(d => { const y = -d * K, w = d % 20 ? 18 : 30;
+    add("line", {x1: -w, y1: y, x2: w, y2: y, class: "hz-tick"});
+    const t = add("text", {x: w + 4, y: y + 3}); t.textContent = d; });
+})();
+let hzQ = 0;
+function updateHorizon(){
+  if (!st.q || hzQ) return;
+  hzQ = requestAnimationFrame(() => { hzQ = 0;
     const r = rotq(st.q, [1, 0, 0]), f = rotq(st.q, [0, 0, -1]);
-    const roll = Math.asin(Math.max(-1, Math.min(1, r[2]))) / D, L = $("level");
-    L.style.display = Math.abs(f[2]) > .8 ? "none" : "block";
-    L.style.transform = `rotate(${Math.abs(roll) < 1.2 ? 0 : -roll}deg)`; L.classList.toggle("ok", Math.abs(roll) < 1.2); }); }
+    const roll = Math.asin(Math.max(-1, Math.min(1, r[2]))) / D, pitch = Math.asin(Math.max(-1, Math.min(1, f[2]))) / D;
+    const H = $("horizon"); H.style.display = "block";
+    $("hz-pitch").setAttribute("transform", `translate(0 ${Math.max(-100, Math.min(100, pitch * 3))})`);
+    $("hz-rot").setAttribute("transform", `rotate(${roll})`);
+    $("hz-num").textContent = `P ${pitch >= 0 ? "+" : ""}${pitch.toFixed(0)}°  ·  R ${roll >= 0 ? "+" : ""}${roll.toFixed(0)}°`;
+    H.classList.toggle("ok", Math.abs(roll) < 1 && Math.abs(pitch) < 1); });
+}
 
 // ---------- record / review ----------
 $("rec").onclick = () => {
@@ -472,21 +586,48 @@ function render(s){
   if (s.rev !== rev) { rev = s.rev; st.hello = true; }
 }
 
+// ---------- connection: WebSocket (one open pipe, low latency); falls back to HTTP if it can't open ----------
+let ws = null, wsOpen = false, transport = "…", vfCount = 0, vfFps = 0, vfUrl = null;
+setInterval(() => { vfFps = vfCount; vfCount = 0;
+  $("netinfo").textContent = `Connection: ${transport}${st.rtt ? " · " + Math.round(st.rtt) + " ms" : ""} · preview ${vfFps} fps`; }, 1000);
+function takeBody(){
+  stepZoom(performance.now());  // keeps the zoom glide going even if the screen stops animating
+  const body = {...st, ct: performance.now()};
+  st.recenter = false; st.cmd = null; st.hello = false; st.lens = null; st.spot = null; st.focus = null;
+  return body;
+}
+function showFrame(blob){ const u = URL.createObjectURL(blob); $("vf").src = u; if (vfUrl) URL.revokeObjectURL(vfUrl); vfUrl = u; vfCount++; }
+function onState(s){
+  if (s.ct) { const r = performance.now() - s.ct; st.rtt = st.rtt == null ? r : st.rtt * 0.8 + r * 0.2; $("lat").textContent = Math.round(st.rtt) + " ms"; }
+  if (s.shots) { if (!s.shots.find(x => x.id === st.shot)) st.shot = s.shot;
+    buildShots(s.shots); const cur = s.shots.find(x => x.id === st.shot) || s.shots[0];
+    $("shotname").textContent = cur ? cur.name : "Timeline"; buildSpots(s.spots, s.spot); }
+  if (st.shot === null) st.shot = s.shot;
+  render(s);
+}
+function startNet(){
+  let opened = false;
+  try { ws = new WebSocket(`wss://${location.host}/ws?k=${encodeURIComponent(KEY)}`); ws.binaryType = "blob"; }
+  catch (e) { ws = null; }
+  if (!ws) { transport = "HTTP"; poseLoop(); viewLoop(); return; }
+  ws.onopen = () => { opened = wsOpen = true; transport = "WebSocket"; st.hello = true;
+    (function send(){ if (!wsOpen) return; try { ws.send(JSON.stringify(takeBody())); } catch (e) {} setTimeout(send, 16); })(); };
+  ws.onmessage = ev => { if (typeof ev.data === "string") { try { onState(JSON.parse(ev.data)); } catch (e) {} } else showFrame(ev.data); };
+  ws.onclose = () => { wsOpen = false;
+    if (!opened) { transport = "HTTP"; poseLoop(); viewLoop(); }
+    else { document.body.classList.add("off"); $("state").textContent = "Reconnecting…"; setTimeout(startNet, 800); } };
+}
+
 async function poseLoop(){
   let fails = 0;
   for (;;) {
     const t0 = performance.now();
     try {
-      stepZoom(performance.now());
-      const body = {...st}; st.recenter = false; st.cmd = null; st.hello = false; st.lens = null; st.spot = null; st.focus = null;
+      const body = takeBody();
       const r = await fetch("/pose", {method: "POST", headers: {"X-PhoneCam-Key": KEY}, body: JSON.stringify(body)});
       if (r.status === 403) { $("pair").style.display = "flex"; await new Promise(r => setTimeout(r, 2000)); continue; }
       const s = await r.json(); fails = 0;
-      if (s.shots) { if (!s.shots.find(x => x.id === st.shot)) st.shot = s.shot;
-        buildShots(s.shots); const cur = s.shots.find(x => x.id === st.shot) || s.shots[0];
-        $("shotname").textContent = cur ? cur.name : "Timeline"; buildSpots(s.spots, s.spot); }
-      if (st.shot === null) st.shot = s.shot;
-      render(s);
+      onState(s);
     } catch (e) {
       if (++fails > 2) { document.body.classList.add("off"); $("state").textContent = "Reconnecting…"; }
       await new Promise(r => setTimeout(r, 600));
@@ -499,7 +640,7 @@ async function viewLoop(){
   for (;;) {
     try {
       const r = await fetch("/view.jpg?k=" + encodeURIComponent(KEY) + "&t=" + Date.now());
-      if (r.status === 200) { const b = await r.blob(); const u = URL.createObjectURL(b); $("vf").src = u; if (url) URL.revokeObjectURL(url); url = u; }
+      if (r.status === 200) showFrame(await r.blob());
       else await new Promise(r => setTimeout(r, 300));
     } catch (e) { await new Promise(r => setTimeout(r, 600)); }
     await new Promise(r => setTimeout(r, 12));

@@ -36,12 +36,20 @@ Keyframing a camera by hand looks robotic. A real handheld camera has life: tiny
 - 🧈 **Smooth by design** — PhoneCam records the full-speed phone motion and rebuilds the camera path, so a heavy scene can never make your take stutter. Motion blur included.
 - 🎯 **Uses your scene** — timeline **markers** become *shots*; every **camera** in the scene becomes a one-tap *camera spot*.
 - 🚗 **Ride along** — film from inside a moving car, horse or spaceship.
+- 🎛️ **Rig presets** — **Handheld, Dolly, Crane, Cinematic, Raw**, plus **Tripod** (rotation only).
+- 🎚️ **Live sliders** — **Sensitivity**, **Smoothing** and **Position scale**, right on the phone.
+- 🧭 **6DoF position tracking** — walk around for real with AR tracking (Android Chrome / WebXR browsers).
+- ⏱️ **Keyframes at 24, 25, 30 or 60 fps** (or your scene's rate), sub-frame accurate.
+- ✈️ **Artificial horizon** — pitch ladder and roll, turns yellow when you're level.
+- ✅ **Preflight check** in Blender — address, ports, 3D Viewport, camera, fps, ffmpeg, latency, with one-click fixes.
+- 🪄 **Smooth Keyframes** and **Bake to World camera** tools for your takes.
+- ⚡ **Low latency** — a WebSocket link (with automatic HTTP fallback) and a live latency readout.
 - 🔒 **Private** — phone and computer talk directly over your own Wi-Fi. No account, no cloud, no internet needed, no tracking.
 - 💸 **Free forever** — open source (GPL-3.0). No ads, no subscription, no watermark.
 
 ## Quick start (3 minutes)
 
-1. **Install** — download [`phonecam-1.0.0.zip`](https://github.com/doo5tet/PhoneCam/releases/latest) and drag it into Blender (4.2 or newer).
+1. **Install** — download [`phonecam-1.1.0.zip`](https://github.com/doo5tet/PhoneCam/releases/latest) and drag it into Blender (4.2 or newer).
 2. **Start** — in the 3D Viewport press **N**, open the **PhoneCam** tab, click **Start PhoneCam**.
 3. **Scan** — point your phone's Camera app at the QR code. The first time, follow the 1-minute setup on the phone. Done — film!
 
@@ -51,7 +59,7 @@ Keyframing a camera by hand looks robotic. A real handheld camera has life: tiny
 
 PhoneCam is a Blender **extension** (Blender 4.2, 4.3, 4.4, 4.5, 5.x).
 
-1. Download **`phonecam-1.0.0.zip`** from [Releases](https://github.com/doo5tet/PhoneCam/releases/latest). Don't unzip it.
+1. Download **`phonecam-1.1.0.zip`** from [Releases](https://github.com/doo5tet/PhoneCam/releases/latest). Don't unzip it.
 2. Either **drag the zip into the Blender window**, or go to **Edit → Preferences → Get Extensions → ⌄ (top right) → Install from Disk…** and pick the zip.
 3. Make sure **PhoneCam** is ticked. That's it.
 
@@ -96,12 +104,30 @@ Next time, just scan and film. Tip: **Share → Add to Home Screen** turns Phone
 | **⊙** | Reset aim to where your phone points |
 | **▭ / ▯** | Wide 16:9 or vertical 9:16 |
 | ✋ | Stabilizer: On → Action → Off |
+| **⚙** | Rig preset, Tripod, Sensitivity / Smoothing / Position scale, keyframe rate, AR tracking, horizon, grid |
 | **Practice** | Rehearse the shot without recording |
 | 🔴 | Record. Then **Watch**, **Retake** or **Save video** |
 
 **Shots** — add timeline markers in Blender (`M` in the timeline) and each marker becomes a shot you can pick on the phone. No markers? The whole timeline is one shot.
 **Camera spots** — every camera in your scene appears as a button at the top of the phone screen; tap to jump there.
-**Your takes** are also kept in Blender as keyframes on the `PhoneCam` camera, so you can tweak them later.
+**Your takes** are also kept in Blender as keyframes on the `PhoneCam` camera, so you can tweak them later. In **N → PhoneCam → Takes**, **Smooth keyframes** irons out a take and **Bake to World camera** saves it as its own camera, so new takes never overwrite it.
+
+### Rig presets
+
+<p align="center"><img src="docs/assets/phone-settings.png" width="520" alt="PhoneCam rig settings: Handheld, Dolly, Crane, Cinematic, Raw presets, Tripod switch, Sensitivity, Smoothing and Position scale sliders, keyframe rate"></p>
+
+| Preset | Feels like |
+|---|---|
+| **Handheld** | Natural hand-held camera with light smoothing |
+| **Dolly** | On rails: level horizon, no height changes, smooth |
+| **Crane** | Big smooth vertical moves (UP/DOWN and AR height ×2), level horizon |
+| **Cinematic** | Very smooth and level, like a gimbal |
+| **Raw** | Exactly what your hand does, no smoothing |
+| **Tripod** (switch) | Rotation only — the camera stays where it is |
+
+### 6DoF position tracking
+
+On phones whose browser supports WebXR AR (e.g. **Android Chrome**), tap **⚙ → Start AR tracking**: the camera now follows your phone's real position as you walk around the room. **Position scale** sets how far it travels (0.05× to 50×). iPhone Safari doesn't offer AR tracking to web pages, so on iPhone you aim by moving the phone and travel with the WALK stick and UP/DOWN.
 
 ## Settings
 
@@ -114,6 +140,9 @@ Next time, just scan and film. Tip: **Share → Add to Home Screen** turns Phone
 
 ## Troubleshooting
 
+Start with **N → PhoneCam → Preflight check**: it shows ✓ or ⚠ for the Wi-Fi address, the phone link, the 3D Viewport, the camera, frame rate, ffmpeg and latency — with a **Fix** button where it can help.
+
+- **No QR code / no preview** — the live preview is drawn from a **3D Viewport**: make sure one is open (the Preflight check's **Fix** button switches to the Layout workspace).
 - **The QR link doesn't open / “can't connect”** — phone and computer must be on the same Wi-Fi. Some café, school and guest networks block devices from seeing each other; use your phone's hotspot instead. Allow Blender in your firewall.
 - **Safari says “This connection is not private”** — finish the one-time certificate step, including *Certificate Trust Settings*.
 - **The picture is sideways or the controls won't turn** — turn off the phone's rotation lock, or pick *Vertical video*.

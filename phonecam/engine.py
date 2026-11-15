@@ -23,7 +23,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import bpy
-from mathutils import Quaternion, Vector
+from mathutils import Matrix, Quaternion, Vector
 
 from . import netinfo, pki
 
@@ -38,6 +38,15 @@ ZOOM_W = 13.0       # zoom smoothing (rad/s); the phone eases the zoom itself, t
 FOCUS_W = 8.0       # focus pull speed
 CINE_FSTOP = 2.0    # Cinematic look: shallow depth of field
 STAB_SIGMA = {"off": 0.0, "on": 0.07, "action": 0.22}  # seconds of hand-shake smoothing baked into takes
+# Rig presets, like real camera support: live smoothing, level horizon, height lock, vertical boost, take stabilizer
+RIGS = {
+    "handheld":  dict(smooth=0.15, roll=True,  height=True,  vmul=1.0, stab="on"),
+    "dolly":     dict(smooth=0.45, roll=False, height=False, vmul=0.0, stab="action"),
+    "crane":     dict(smooth=0.50, roll=False, height=True,  vmul=2.0, stab="action"),
+    "cinematic": dict(smooth=0.65, roll=False, height=True,  vmul=1.0, stab="action"),
+    "raw":       dict(smooth=0.0,  roll=True,  height=True,  vmul=1.0, stab="off"),
+}
+KRATES = (0, 24, 25, 30, 60)  # keyframe rate of recorded takes (0 = the scene's frame rate)
 # Fisheye = barrel distortion; the SAME numbers warp the live preview (numpy) and the saved video (ffmpeg)
 FISH_K1, FISH_K2 = 0.5, 0.25
 VF_W, VF_H, VF_FPS = 480, 270, 30
@@ -87,7 +96,8 @@ def _reset_state():
              mode="LIVE", shot="ALL", seen=0.0, take=0, frame=1, run=None, samples=[], raw=None, render=0.0, video="",
              msg="", jpg=None, reel=False, fx="normal", stab="on", focus=[0.5, 0.5], focus_d=5.0, focus_cur=5.0,
              focus_vel=0.0, shots=[], spots=[], rev="", fps=24.0, status="Starting…", ready=False, error="",
-             phone_name="")
+             phone_name="", sens=1.0, smooth=RIGS["handheld"]["smooth"], pscale=1.0, tripod=False, rig="handheld",
+             krate=0, pos=None, xr=False, ct=None, rtt=None, track=None, jpg_id=0, ws=0)
 
 
 _reset_state()
@@ -299,35 +309,106 @@ def smooth_zoom(dt):
     return S["lens_cur"]
 
 
-def apply_pose(dt):
+def settings():
+    return dict(sens=S["sens"], smooth=S["smooth"], pscale=S["pscale"], tripod=S["tripod"], rig=S["rig"],
+                walk=CFG.get("walk_speed", 3.0))
+
+
+def new_track(loc, q, ride=""):
+    return dict(loc=loc.copy(), base=loc.copy(), q=q.copy(), yaw=0.0, need=True, qref=None, pos_ref=None, ride=ride)
+
+
+def copy_track(T):
+    return {k: (v.copy() if hasattr(v, "copy") else v) for k, v in T.items()}
+
+
+def track_step(T, qp, pos, jx, jy, vz, st, dt, ride=False):
+    """THE camera rules. Used live and again when a take is rebuilt, so the saved take is exactly what you filmed."""
+    rig = RIGS.get(st["rig"], RIGS["handheld"])
+    sm = max(0.0, min(1.0, st["smooth"]))
+    tau = 0.6 * sm * sm                                    # smoothing slider -> time constant (0 .. 0.6 s)
+    k = 1.0 if tau < 1e-3 else 1.0 - math.exp(-dt / tau)
+    if qp is not None:
+        if T["need"]:  # (re)centre: keep the camera's heading; the phone's pose now becomes the reference
+            T["qref"] = qp.copy()
+            T["yaw"] = heading(T["q"]) - heading(qp)
+            T["pos_ref"] = pos.copy() if pos is not None else None
+            T["base"] = T["loc"].copy()
+            T["need"] = False
+        q = qp
+        sens = st["sens"]
+        if abs(sens - 1.0) > 1e-3 and T["qref"] is not None:  # sensitivity: scale the turn away from the reference
+            d = qp @ T["qref"].inverted()
+            ax, an = d.to_axis_angle()
+            if an > math.pi:
+                an -= 2 * math.pi
+            q = Quaternion(ax, an * sens) @ T["qref"]
+        qt = Quaternion((0, 0, 1), T["yaw"]) @ q
+        if not rig["roll"]:  # level horizon (dolly, crane, cinematic)
+            fwd = qt @ Vector((0, 0, -1))
+            if abs(fwd.z) < 0.999:
+                qt = fwd.to_track_quat("-Z", "Y")
+        if T["q"].dot(qt) < 0:
+            qt = -qt
+        T["q"] = T["q"].slerp(qt, k) if k < 1.0 else qt
+    if st["tripod"]:  # rotation only: the camera stays put
+        return
+    h = heading(T["q"])
+    fwd, right = Vector((math.cos(h), math.sin(h), 0)), Vector((math.sin(h), -math.cos(h), 0))
+    T["base"] += (fwd * jy + right * jx) * (1.2 if ride else st["walk"]) * st["pscale"] * dt
+    if rig["height"]:
+        T["base"].z += vz * (0.8 if ride else 1.5) * st["pscale"] * max(1.0, rig["vmul"]) * dt
+    target = T["base"].copy()
+    if pos is not None and T["pos_ref"] is not None:  # real phone movement (AR / 6DoF)
+        dp = Matrix.Rotation(T["yaw"], 3, "Z") @ ((pos - T["pos_ref"]) * st["pscale"])
+        dp.z = dp.z * rig["vmul"] if rig["height"] else 0.0
+        target += dp
+    if ride:
+        target.z = max(0.3, min(4.0, target.z))
+    kp = 1.0 if tau < 1e-3 else 1.0 - math.exp(-dt / (tau * 0.7))
+    T["loc"] = T["loc"].lerp(target, kp)
+
+
+def track():
+    """The live camera state (in the ride object's space when riding along)."""
+    ride = ride_obj()
+    rn = ride.name if ride else ""
+    T = S.get("track")
+    if T is None or T.get("ride") != rn:
+        cam = cam_obj()
+        if ride:
+            inv = ride.matrix_world.inverted()
+            T = new_track(inv @ cam.matrix_world.translation, inv.to_quaternion() @ cam.matrix_world.to_quaternion(), rn)
+        else:
+            T = new_track(cam.matrix_world.translation.copy(), cam.matrix_world.to_quaternion(), rn)
+        S["track"] = T
+    return T
+
+
+def place_cam(T):
     cam = cam_obj()
+    cam.rotation_mode = "QUATERNION"
+    ride = bpy.data.objects.get(T.get("ride") or "")
+    if ride:
+        mw = ride.matrix_world
+        cam.location = mw @ T["loc"]
+        cam.rotation_quaternion = mw.to_quaternion() @ T["q"]
+    else:
+        cam.location = T["loc"]
+        cam.rotation_quaternion = T["q"]
+
+
+def apply_pose(dt):
     if S["q"] is None:
         return
-    qp = Quaternion(S["q"])
-    cam.rotation_mode = "QUATERNION"
-    ride = ride_obj()
-    if ride:  # riding along: aim and walk relative to the vehicle
-        if S["recenter"]:
-            S["yaw"] = heading(S["local_rot"]) - heading(qp)
-            S["recenter"] = False
-        ql = Quaternion((0, 0, 1), S["yaw"]) @ qp
-        S["local_q"] = ql
-        h = heading(ql)
-        fwd, right = Vector((math.cos(h), math.sin(h), 0)), Vector((math.sin(h), -math.cos(h), 0))
-        S["local_loc"] += (fwd * S["jy"] + right * S["jx"]) * 1.2 * dt
-        S["local_loc"].z = max(0.3, min(4.0, S["local_loc"].z + S["vz"] * 0.8 * dt))
-        place_in_ride(cam, ride, ql)
-    else:
-        if S["recenter"]:  # keep the camera's heading; tilt and roll always follow the phone
-            S["yaw"] = heading(cam.matrix_world.to_quaternion()) - heading(qp)
-            S["recenter"] = False
-        q = Quaternion((0, 0, 1), S["yaw"]) @ qp
-        cam.rotation_quaternion = q
-        h = heading(q)
-        fwd, right = Vector((math.cos(h), math.sin(h), 0)), Vector((math.sin(h), -math.cos(h), 0))
-        cam.location += (fwd * S["jy"] + right * S["jx"]) * CFG.get("walk_speed", 3.0) * dt
-        cam.location.z += S["vz"] * 1.5 * dt
-    cam.data.lens = smooth_zoom(dt)
+    T = track()
+    if S["recenter"]:
+        T["need"] = True
+        S["recenter"] = False
+    pos = Vector(S["pos"]) if S.get("pos") else None
+    track_step(T, Quaternion(S["q"]), pos, S["jx"], S["jy"], S["vz"], settings(), dt, ride=bool(T.get("ride")))
+    place_cam(T)
+    cam_obj().data.lens = smooth_zoom(dt)
 
 
 def focus_ray():
@@ -390,18 +471,16 @@ def jump_to_spot(i):
     i = max(0, min(i, len(spots) - 1))
     sp = spots[i]
     lens = ZOOM_MIN if S["fx"] == "fisheye" else min(ZOOM_MAX, max(ZOOM_MIN, sp["lens"]))
-    q = Quaternion(sp["q"])
+    q, loc = Quaternion(sp["q"]), Vector(sp["loc"])
     ride = ride_obj()
     if ride:
         inv = ride.matrix_world.inverted()
-        S["local_loc"] = inv @ Vector(sp["loc"])
-        S["local_rot"] = S["local_q"] = inv.to_quaternion() @ q
-        place_in_ride(cam, ride, S["local_rot"])
+        T = new_track(inv @ loc, inv.to_quaternion() @ q, ride.name)
     else:
-        cam.location = sp["loc"]
-        cam.rotation_mode = "QUATERNION"
-        cam.rotation_quaternion = q
-    S.update(spot=i, lens=float(lens), lens_cur=float(lens), lens_vel=0.0, lens_rev=S["lens_rev"] + 1, recenter=True)
+        T = new_track(loc, q)
+    S["track"] = T
+    place_cam(T)
+    S.update(spot=i, lens=float(lens), lens_cur=float(lens), lens_vel=0.0, lens_rev=S["lens_rev"] + 1, recenter=False)
     cam.data.lens = lens
 
 
@@ -432,89 +511,88 @@ def begin_run(mode):
     cam = cam_obj()
     clear_take(cam)
     scene().frame_set(s["start"])
-    ride = ride_obj()
-    S["rec0"] = dict(loc=(S["local_loc"].copy() if ride else cam.location.copy()),
-                     q=(S["local_q"].copy() if ride else cam.rotation_quaternion.copy()),
-                     local_rot=S["local_rot"].copy(), yaw=S["yaw"], recenter=bool(S["recenter"]), q_phone=S["q"],
-                     lens=_pos(S["lens_cur"], ZOOM_1X), lens_vel=S["lens_vel"], lens_tgt=_pos(S["lens"], ZOOM_1X),
-                     jx=S["jx"], jy=S["jy"], vz=S["vz"])
+    T = track()
+    if S["recenter"]:
+        T["need"] = True
+        S["recenter"] = False
+    st = settings()
+    S["rec0"] = dict(track=copy_track(T), set=st, q_phone=S["q"], pos=S.get("pos"), lens=_pos(S["lens_cur"], ZOOM_1X),
+                     lens_vel=S["lens_vel"], lens_tgt=_pos(S["lens"], ZOOM_1X), jx=S["jx"], jy=S["jy"], vz=S["vz"])
     S["raw"] = []
     S.update(mode=mode, run={"a": s["start"], "b": s["end"], "t0": time.time()}, samples=[], msg="", video="",
-             take_ride=ride.name if ride else "", take_reel=bool(S.get("_reel_on")), take_fx=S["fx"], take_stab=S["stab"],
-             take_shot=s["name"])
+             take_ride=T.get("ride", ""), take_reel=bool(S.get("_reel_on")), take_fx=S["fx"],
+             take_stab=RIGS.get(st["rig"], RIGS["handheld"])["stab"], take_krate=S["krate"], take_shot=s["name"])
 
 
 def capture_sample(t):
     cam = cam_obj()
-    if S.get("take_ride"):
-        S["samples"].append((t, S["local_loc"].copy(), S["local_q"].copy(), cam.data.lens, S["focus_cur"]))
+    T = S.get("track")
+    if S.get("take_ride") and T is not None:
+        S["samples"].append((t, T["loc"].copy(), T["q"].copy(), cam.data.lens, S["focus_cur"]))
     else:
         S["samples"].append((t, cam.location.copy(), cam.rotation_quaternion.copy(), cam.data.lens, S["focus_cur"]))
 
 
-def rebuild_from_phone(n, fps):
-    """Replay the recorded phone stream through the live-camera rules at 5x the frame rate -> one pose per frame."""
+def rebuild_from_phone(tout):
+    """Replay the recorded phone stream through track_step at 240 Hz; sample the pose at the times in tout."""
     R, r0 = list(S.get("raw") or []), S.get("rec0")
     if not r0 or len(R) < 8 or R[-1][0] < 0.3:
         return None
     ride = bool(S.get("take_ride"))
     times = [x[0] for x in R]
-    qs, last = [], (Quaternion(r0["q_phone"]) if r0["q_phone"] else None)
+    qs, ps = [], []
+    lq = Quaternion(r0["q_phone"]) if r0["q_phone"] else None
+    lp = Vector(r0["pos"]) if r0["pos"] else None
     for x in R:
         if x[1] is not None:
-            last = Quaternion(x[1])
-        qs.append(last)
+            lq = Quaternion(x[1])
+        if x[7] is not None:
+            lp = Vector(x[7])
+        qs.append(lq); ps.append(lp)
     for i in range(1, len(qs)):
         if qs[i] is not None and qs[i - 1] is not None and qs[i].dot(qs[i - 1]) < 0:
             qs[i] = -qs[i]
-    pos, qcur, yaw, need = r0["loc"].copy(), r0["q"].copy(), r0["yaw"], r0["recenter"]
+    T, st = copy_track(r0["track"]), r0["set"]
     lens, lv, tgt = max(ZOOM_MIN, r0["lens"]), r0["lens_vel"], r0["lens_tgt"]
     jx, jy, vz = r0["jx"], r0["jy"], r0["vz"]
-    walk = CFG.get("walk_speed", 3.0)
-    SUB = 5
-    dt = 1.0 / (fps * SUB)
+    dt = 1.0 / 240.0
     L, Q, N = [], [], []
-    j = 0
-    for step in range(n * SUB + 1):
+    j, io = 0, 0
+    steps = int(tout[-1] / dt) + 2
+    for step in range(steps):
         t = step * dt
         while j < len(R) and R[j][0] <= t:
-            _t, _q, jx, jy, vz, ln, rc = R[j]
+            _t, _q, jx, jy, vz, ln, rc, _p = R[j]
             if ln is not None:
                 tgt = ln
             if rc:
-                need = True
+                T["need"] = True
             j += 1
         if j == 0:
-            qp = Quaternion(r0["q_phone"]) if r0["q_phone"] else qs[0]
+            qp, pp = (Quaternion(r0["q_phone"]) if r0["q_phone"] else qs[0]), (Vector(r0["pos"]) if r0["pos"] else ps[0])
         elif j >= len(R):
-            qp = qs[-1]
+            qp, pp = qs[-1], ps[-1]
         else:
             t0_, t1_ = times[j - 1], times[j]
             u = 0.0 if t1_ <= t0_ else min(1.0, max(0.0, (t - t0_) / (t1_ - t0_)))
             a_, b_ = qs[j - 1], qs[j]
             qp = a_.slerp(b_, u) if a_ is not None and b_ is not None else (b_ or a_)
-        if qp is not None:
-            if need:
-                yaw = heading(r0["local_rot"] if ride else qcur) - heading(qp)
-                need = False
-            qcur = Quaternion((0, 0, 1), yaw) @ qp
-            h = heading(qcur)
-            fwd, right = Vector((math.cos(h), math.sin(h), 0)), Vector((math.sin(h), -math.cos(h), 0))
-            if ride:
-                pos += (fwd * jy + right * jx) * 1.2 * dt
-                pos.z = max(0.3, min(4.0, pos.z + vz * 0.8 * dt))
-            else:
-                pos += (fwd * jy + right * jx) * walk * dt
-                pos.z += vz * 1.5 * dt
+            pa, pb = ps[j - 1], ps[j]
+            pp = pa.lerp(pb, u) if pa is not None and pb is not None else (pb or pa)
+        track_step(T, qp, pp, jx, jy, vz, st, dt, ride)
         x, lv = crit_damp(math.log(lens), lv, math.log(min(ZOOM_MAX, max(ZOOM_MIN, tgt))), ZOOM_W, dt)
         lens = math.exp(x)
-        if step % SUB == 0:
-            L.append(pos.copy()); Q.append(qcur.copy()); N.append(lens)
+        while io < len(tout) and tout[io] <= t + 1e-9:
+            L.append(T["loc"].copy()); Q.append(T["q"].copy()); N.append(lens)
+            io += 1
+    while io < len(tout):
+        L.append(T["loc"].copy()); Q.append(T["q"].copy()); N.append(lens)
+        io += 1
     return L, Q, N
 
 
 def bake_take():
-    """Turn the take into one keyframe per frame on PhoneCam. Returns the frame range."""
+    """Turn the take into keyframes on PhoneCam at the chosen keyframe rate. Returns the frame range."""
     cam, smp = cam_obj(), S["samples"]
     a = S["run"]["a"]
     fps = S["fps"]
@@ -525,31 +603,33 @@ def bake_take():
             t, l, q, ln, fd = smp[i]
             smp[i] = (t, l, -q, ln, fd)
     times = [x[0] for x in smp]
-    n = max(1, int(times[-1] * fps))
+    dur = times[-1]
+    rate = float(S.get("take_krate") or fps)
+    m = max(1, int(dur * rate))
+    tout = [i / rate for i in range(m + 1)]
     L, Q, N, F = [], [], [], []
-    for i in range(n + 1):
-        t = i / fps
+    for t in tout:
         j = min(max(bisect.bisect_right(times, t), 1), len(smp) - 1)
         t0, l0, q0, n0, f0 = smp[j - 1]
         t1, l1, q1, n1, f1 = smp[j]
         u = 0.0 if t1 <= t0 else min(1.0, max(0.0, (t - t0) / (t1 - t0)))
         L.append(l0.lerp(l1, u)); Q.append(q0.slerp(q1, u)); N.append(n0 + (n1 - n0) * u); F.append(f0 + (f1 - f0) * u)
-    rebuilt = rebuild_from_phone(n, fps)  # better: the full-rate phone stream (Blender lag can't make it stutter)
+    rebuilt = rebuild_from_phone(tout)  # better: the full-rate phone stream (Blender lag can't make it stutter)
     if rebuilt:
         L, Q, N = rebuilt
         for i in range(1, len(Q)):
             if Q[i].dot(Q[i - 1]) < 0:
                 Q[i] = -Q[i]
-    sig = STAB_SIGMA.get(S.get("take_stab", "on"), 0.0) * fps
+    sig = STAB_SIGMA.get(S.get("take_stab", "on"), 0.0) * rate
     if sig > 0.3:  # stabilizer: centred Gaussian smoothing (no lag)
         rad = int(sig * 3) + 1
         wts = [math.exp(-0.5 * (k / sig) ** 2) for k in range(-rad, rad + 1)]
         L2, Q2 = [], []
-        for i in range(n + 1):
+        for i in range(m + 1):
             acc_l, aw, ax, ay, az, wsum = Vector((0, 0, 0)), 0.0, 0.0, 0.0, 0.0, 0.0
             for k in range(-rad, rad + 1):
                 j = i + k
-                if 0 <= j <= n:
+                if 0 <= j <= m:
                     w = wts[k + rad]
                     q = Q[j] if Q[j].dot(Q[i]) >= 0 else -Q[j]
                     acc_l += L[j] * w
@@ -563,10 +643,10 @@ def bake_take():
     ride = bpy.data.objects.get(S.get("take_ride") or "")
     sc = scene()
     cine = S.get("take_fx") == "cinema"
-    for i in range(n + 1):
-        f = a + i
+    for i, t in enumerate(tout):
+        f = a + t * fps
         if ride:
-            sc.frame_set(f)
+            sc.frame_set(int(f), subframe=f - int(f))
             mw = ride.matrix_world
             cam.location = mw @ L[i]
             cam.rotation_quaternion = mw.to_quaternion() @ Q[i]
@@ -586,7 +666,7 @@ def bake_take():
         if id_.animation_data and id_.animation_data.action:
             act = id_.animation_data.action
             act.name, act.use_fake_user = name, True
-    return a, a + n
+    return a, int(round(a + dur * fps))
 
 
 def finish_recording():
@@ -763,7 +843,7 @@ def on_load_post(*args):
     """A different .blend was opened: forget the old take and start fresh."""
     if not _srv:
         return
-    S.update(mode="LIVE", run=None, samples=[], raw=None, recenter=True)
+    S.update(mode="LIVE", run=None, samples=[], raw=None, recenter=True, track=None)
     S.pop("home", None)
     S["_need_home"] = True
 
@@ -877,6 +957,7 @@ def grab_viewfinder():
     img.save(quality=72)
     with open(path, "rb") as f:
         S["jpg"] = f.read()
+    S["jpg_id"] += 1
 
 
 # ---------------------------------------------------------------- the main loop (Blender's main thread)
@@ -975,7 +1056,7 @@ def tick():
                 if live:
                     apply_pose(dt)
                 elif ride_obj():
-                    place_in_ride(cam_obj(), ride_obj(), S["local_q"])
+                    place_cam(track())
                 update_focus(dt, now)
             except Exception as e:
                 _report(e)
@@ -1027,6 +1108,12 @@ class CameraHandler(BaseHTTPRequestHandler):
         q = _query(self.path)
         if self.path.startswith("/ping"):  # the setup page checks "does the phone trust this computer yet?"
             return self._send(b"ok", "text/plain", extra={"Access-Control-Allow-Origin": "*"})
+        if self.path.startswith("/ws"):
+            if not _check_key(self, q):
+                return self._send(b"", "text/plain", 403)
+            if self.headers.get("Upgrade", "").lower() != "websocket":
+                return self._send(b"", "text/plain", 400)
+            return self._websocket()
         if self.path.startswith("/view.jpg"):
             if not _check_key(self, q):
                 return self._send(b"", "image/jpeg", 403)
@@ -1047,55 +1134,182 @@ class CameraHandler(BaseHTTPRequestHandler):
             msg = json.loads(raw_body)
         except ValueError:
             msg = {}
-        S["seen"] = time.time()
-        q = msg.get("q")
-        if isinstance(q, list) and len(q) == 4 and all(isinstance(c, (int, float)) and math.isfinite(c) for c in q):
-            S["q"] = q
-        for k in ("jx", "jy", "vz"):
-            v = msg.get(k)
-            if isinstance(v, (int, float)) and math.isfinite(v):
-                S[k] = max(-1.0, min(1.0, float(v)))
-        ln = _pos(msg.get("lens"), None)
-        if ln is not None:
-            S["lens"] = min(ZOOM_MAX, max(ZOOM_MIN, ln))
-        run = S["run"]
-        if S["mode"] == "REC" and run and S.get("raw") is not None:
-            S["raw"].append((time.time() - run["t0"], S["q"] if "q" in msg else None, S["jx"], S["jy"], S["vz"],
-                             S["lens"] if ln is not None else None, bool(msg.get("recenter"))))
-        if msg.get("recenter"):
+        self._send(json.dumps(handle_msg(msg)).encode(), "application/json")
+
+    # ------------------------------------------------ WebSocket: one open pipe, lower latency than HTTP
+    def _websocket(self):
+        import base64
+        import hashlib
+        import socket as _sock
+        key = self.headers.get("Sec-WebSocket-Key", "")
+        acc = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
+        self.send_response(101, "Switching Protocols")
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", acc)
+        self.end_headers()
+        sock = self.connection
+        buf = bytearray()
+        last_state, last_jpg, pending = 0.0, -1, None
+        S["ws"] += 1
+
+        def send(op, payload):
+            n = len(payload)
+            head = bytes([0x80 | op]) + (bytes([n]) if n < 126 else (bytes([126]) + n.to_bytes(2, "big") if n < 65536
+                                                                      else bytes([127]) + n.to_bytes(8, "big")))
+            sock.settimeout(None)
+            sock.sendall(head + payload)
+            sock.settimeout(0.012)
+        try:
+            sock.settimeout(0.012)
+            while _srv:
+                try:
+                    chunk = sock.recv(65536)
+                    if not chunk:
+                        break
+                    buf += chunk
+                except (_sock.timeout, TimeoutError, ssl.SSLWantReadError, BlockingIOError):
+                    pass
+                urgent = False
+                while True:
+                    fr = _ws_parse(buf)
+                    if fr is None:
+                        break
+                    op, payload, used = fr
+                    del buf[:used]
+                    if op == 8:
+                        send(8, b"")
+                        return
+                    if op == 9:
+                        send(10, payload)
+                    elif op == 1:
+                        try:
+                            msg = json.loads(payload)
+                        except ValueError:
+                            continue
+                        pending = handle_msg(msg)
+                        urgent = urgent or bool(msg.get("cmd") or msg.get("hello"))
+                now = time.time()
+                if pending is not None and (urgent or now - last_state > 0.045):
+                    send(1, json.dumps(pending).encode())
+                    pending, last_state = None, now
+                if S["jpg"] and S["jpg_id"] != last_jpg:
+                    last_jpg = S["jpg_id"]
+                    S["seen"] = now
+                    send(2, S["jpg"])
+        except (OSError, ssl.SSLError):
+            pass
+        finally:
+            S["ws"] -= 1
+            self.close_connection = True
+
+
+def _ws_parse(buf):
+    """One client frame from buf: (opcode, payload, bytes used) or None if incomplete."""
+    if len(buf) < 2:
+        return None
+    op, masked, ln, i = buf[0] & 0x0F, buf[1] & 0x80, buf[1] & 0x7F, 2
+    if ln == 126:
+        if len(buf) < 4:
+            return None
+        ln, i = int.from_bytes(buf[2:4], "big"), 4
+    elif ln == 127:
+        if len(buf) < 10:
+            return None
+        ln, i = int.from_bytes(buf[2:10], "big"), 10
+    mask = b""
+    if masked:
+        if len(buf) < i + 4:
+            return None
+        mask, i = bytes(buf[i:i + 4]), i + 4
+    if len(buf) < i + ln:
+        return None
+    data = bytes(buf[i:i + ln])
+    if masked:
+        data = bytes(b ^ mask[k & 3] for k, b in enumerate(data))
+    return op, data, i + ln
+
+
+def _num(v, lo, hi):
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
+        return max(lo, min(hi, float(v)))
+    return None
+
+
+def handle_msg(msg):
+    """Store one message from the phone and answer with Blender's state (shared by HTTP and WebSocket)."""
+    S["seen"] = time.time()
+    q = msg.get("q")
+    if isinstance(q, list) and len(q) == 4 and all(isinstance(c, (int, float)) and math.isfinite(c) for c in q):
+        S["q"] = q
+    for k in ("jx", "jy", "vz"):
+        v = _num(msg.get(k), -1.0, 1.0)
+        if v is not None:
+            S[k] = v
+    ln = _pos(msg.get("lens"), None)
+    if ln is not None:
+        S["lens"] = min(ZOOM_MAX, max(ZOOM_MIN, ln))
+    if "pos" in msg:  # real phone position from AR tracking (Blender axes, metres) or None when it stops
+        p = msg["pos"]
+        newp = [float(c) for c in p] if isinstance(p, list) and len(p) == 3 and all(_num(c, -1e4, 1e4) is not None for c in p) else None
+        if (newp is None) != (S.get("pos") is None):
             S["recenter"] = True
-        if "reel" in msg:
-            S["reel"] = bool(msg["reel"])
-        if msg.get("fx") in ("normal", "fisheye", "cinema"):
-            S["fx"] = msg["fx"] if (msg["fx"] != "fisheye" or _ffmpeg()) else "normal"
-        if msg.get("stab") in STAB_SIGMA:
-            S["stab"] = msg["stab"]
-        f = msg.get("focus")
-        if isinstance(f, list) and len(f) == 2:
-            try:
-                S["focus"] = [min(1.0, max(0.0, float(f[0]))), min(1.0, max(0.0, float(f[1])))]
-            except (TypeError, ValueError):
-                pass
-        if msg.get("cmd") in ("goto", "spot", "practice", "rec", "stop", "save", "retake", "watch"):
-            S["cmd"] = msg["cmd"]
-            if isinstance(msg.get("spot"), int):
-                S["spot"] = msg["spot"]
-        if isinstance(msg.get("shot"), str) and any(s["id"] == msg["shot"] for s in S["shots"]):
-            S["shot"] = msg["shot"]
-        sh = shot()
-        fps = S["fps"] or 24.0
-        out = {k: S[k] for k in ("mode", "take", "shot", "frame", "render", "video", "msg", "lens", "lens_rev", "spot", "eta", "fx", "stab", "rev")}
-        out["af"] = round(S["focus_cur"], 1)
-        out["fisheye_ok"] = bool(_ffmpeg())
-        out["hint"] = S.get("msg_vf", "")
-        tr = S.get("take_range")
-        out.update(start=sh["start"], end=sh["end"], elapsed=round(time.time() - run["t0"], 1) if run else 0.0,
-                   length=round((sh["end"] - sh["start"] + 1) / fps, 1),
-                   take_len=round((tr[1] - tr[0] + 1) / fps, 1) if tr else 0.0, playing=bool(run))
-        if msg.get("hello"):
-            out["shots"] = [dict(id=s["id"], name=s["name"], secs=round((s["end"] - s["start"] + 1) / fps, 1)) for s in S["shots"]]
-            out["spots"] = [s["name"] for s in S["spots"]]
-        self._send(json.dumps(out).encode(), "application/json")
+        S["pos"] = newp
+    run = S["run"]
+    if S["mode"] == "REC" and run and S.get("raw") is not None:
+        S["raw"].append((time.time() - run["t0"], S["q"] if "q" in msg else None, S["jx"], S["jy"], S["vz"],
+                         S["lens"] if ln is not None else None, bool(msg.get("recenter")), S.get("pos") if "pos" in msg else None))
+    if msg.get("recenter"):
+        S["recenter"] = True
+    if "reel" in msg:
+        S["reel"] = bool(msg["reel"])
+    if msg.get("fx") in ("normal", "fisheye", "cinema"):
+        S["fx"] = msg["fx"] if (msg["fx"] != "fisheye" or _ffmpeg()) else "normal"
+    if S["mode"] in ("LIVE", "PRACTICE"):  # rig settings can't change in the middle of a take
+        for k, lo, hi in (("sens", 0.25, 3.0), ("smooth", 0.0, 1.0), ("pscale", 0.05, 50.0)):
+            v = _num(msg.get(k), lo, hi)
+            if v is not None:
+                S[k] = v
+        if isinstance(msg.get("tripod"), bool):
+            S["tripod"] = msg["tripod"]
+        if msg.get("rig") in RIGS:
+            S["rig"] = msg["rig"]
+        if msg.get("krate") in KRATES:
+            S["krate"] = msg["krate"]
+    if "xr" in msg:
+        S["xr"] = bool(msg["xr"])
+    rt = _num(msg.get("rtt"), 0, 10000)
+    if rt is not None:
+        S["rtt"] = rt
+    f = msg.get("focus")
+    if isinstance(f, list) and len(f) == 2:
+        try:
+            S["focus"] = [min(1.0, max(0.0, float(f[0]))), min(1.0, max(0.0, float(f[1])))]
+        except (TypeError, ValueError):
+            pass
+    if msg.get("cmd") in ("goto", "spot", "practice", "rec", "stop", "save", "retake", "watch"):
+        S["cmd"] = msg["cmd"]
+        if isinstance(msg.get("spot"), int):
+            S["spot"] = msg["spot"]
+    if isinstance(msg.get("shot"), str) and any(s["id"] == msg["shot"] for s in S["shots"]):
+        S["shot"] = msg["shot"]
+    sh = shot()
+    fps = S["fps"] or 24.0
+    out = {k: S[k] for k in ("mode", "take", "shot", "frame", "render", "video", "msg", "lens", "lens_rev", "spot", "eta", "fx",
+                             "rev", "sens", "smooth", "pscale", "tripod", "rig", "krate")}
+    out["af"] = round(S["focus_cur"], 1)
+    out["fisheye_ok"] = bool(_ffmpeg())
+    out["hint"] = S.get("msg_vf", "")
+    out["fps"] = fps
+    out["ct"] = msg.get("ct")
+    tr = S.get("take_range")
+    out.update(start=sh["start"], end=sh["end"], elapsed=round(time.time() - run["t0"], 1) if run else 0.0,
+               length=round((sh["end"] - sh["start"] + 1) / fps, 1),
+               take_len=round((tr[1] - tr[0] + 1) / fps, 1) if tr else 0.0, playing=bool(run))
+    if msg.get("hello"):
+        out["shots"] = [dict(id=s["id"], name=s["name"], secs=round((s["end"] - s["start"] + 1) / fps, 1)) for s in S["shots"]]
+        out["spots"] = [s["name"] for s in S["spots"]]
+    return out
 
 
 class SetupHandler(BaseHTTPRequestHandler):

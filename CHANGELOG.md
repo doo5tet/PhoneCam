@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0
+
+- **Rig presets**: Handheld, Dolly, Crane, Cinematic, Raw — plus **Tripod** (rotation only).
+- **Live sliders** on the phone: Sensitivity, Smoothing, Position scale.
+- **6DoF position tracking** through WebXR AR (Android Chrome and other WebXR browsers).
+- **Keyframe rate**: record takes at 24, 25, 30 or 60 fps (or the scene rate), sub-frame accurate.
+- **Artificial horizon** with pitch ladder and roll readout.
+- **Preflight check** panel in Blender with one-click fixes.
+- **Take tools**: Smooth keyframes, Bake to World camera.
+- **WebSocket** link for lower latency (automatic HTTP fallback) and a live latency readout.
+- The same camera rules drive the live view and the rebuilt take, so saved takes match what you filmed.
+
 ## 1.0.0 — first public release
 
 - Your phone (iPhone or Android, in Safari or Chrome) becomes a handheld camera for Blender 4.2+.
